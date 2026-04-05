@@ -1,0 +1,31 @@
+{
+  "name": "educlip",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EduClip — 다중 에이전트 오케스트레이션 기반 AI 교육 플랫폼",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter server dev & pnpm --filter ui dev",
+    "build": "pnpm --filter '!ui' build && pnpm --filter ui build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @educlip/db db:generate",
+    "db:migrate": "pnpm --filter @educlip/db db:migrate",
+    "db:seed": "pnpm --filter @educlip/db db:seed",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0",
+    "@playwright/test": "^1.43.0"
+  }
+}
