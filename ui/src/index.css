@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* 모바일 300px ~ 데스크톱 1920px 지원 */
+    @apply text-[14px] sm:text-[15px] md:text-base;
+  }
+
+  body {
+    @apply bg-gray-100 text-gray-900 antialiased;
+  }
+
+  :root {
+    --chat-bg: #b2c7d9;         /* 카카오톡 기본 배경색 */
+    --header-bg: #3b4a5c;       /* 헤더 배경 */
+    --bubble-user: #fef08a;     /* 본인 말풍선 */
+    --bubble-ai: #ffffff;       /* AI 말풍선 */
+  }
+}
+
+@layer components {
+  /* 채팅창 전체 레이아웃 */
+  .chat-layout {
+    @apply flex flex-col h-[100dvh] max-w-screen-sm mx-auto bg-[var(--chat-bg)] shadow-xl relative;
+  }
+
+  /* 공통 버블 기반 스타일 */
+  .bubble-base {
+    @apply max-w-[75%] rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm break-words;
+  }
+
+  /* 입력창 컨테이너 */
+  .chat-input-bar {
+    @apply flex items-end gap-2 px-3 py-2 bg-white border-t border-gray-200;
+  }
+}

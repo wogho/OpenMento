@@ -1,0 +1,105 @@
+# EduClip — Docker Compose
+# Production:  pnpm docker:up
+# Development: pnpm docker:dev
+
+services:
+  # ── API Server ──────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      target: production
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-educlip_user}:${POSTGRES_PASSWORD:-educlip_pass}@db:5432/${POSTGRES_DB:-educlip_db}
+      NODE_ENV: production
+      PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars}
+      # BullMQ Webhook Worker용 Redis 연결 (Phase 2-5 개선 ①)
+      REDIS_URL: redis://redis:6379
+      # Heartbeat cron 스케줄러 타임존 고정 (KST)
+      TZ: ${TZ:-Asia/Seoul}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── PostgreSQL 16 + pgvector ─────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-educlip_db}
+      POSTGRES_USER: ${POSTGRES_USER:-educlip_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlip_pass}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educlip_user} -d ${POSTGRES_DB:-educlip_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Redis (BullMQ / Job Queue) ─────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ── UI (Nginx static) ────────────────────────────────────────
+  ui:
+    build:
+      context: ..
+      dockerfile: ui/Dockerfile
+      target: production
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── MCP Gateway ──────────────────────────────────────────────
+  mcp-gateway:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+      target: production
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-educlip_user}:${POSTGRES_PASSWORD:-educlip_pass}@db:5432/${POSTGRES_DB:-educlip_db}
+      NODE_ENV: production
+      PORT: "3001"
+      SERVER_MODE: mcp
+      TZ: ${TZ:-Asia/Seoul}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    name: educlip_db_data
+  redis_data:
+    name: educlip_redis_data

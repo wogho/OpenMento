@@ -1,0 +1,46 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
+import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
+import LoginPage from './pages/LoginPage';
+import ChatPage from './pages/ChatPage';
+import AdminPage from './pages/AdminPage';
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* 루트 → 채팅 페이지로 리다이렉트 */}
+          <Route path="/" element={<Navigate to="/chat" replace />} />
+
+          {/* 공개 라우트 */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* 보호된 라우트 (수강생 튜터) */}
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 보호된 라우트 (관리자 허브) — admin role 전용 */}
+          <Route
+            path="/admin/*"
+            element={
+              <AdminRoute>
+                <AdminPage />
+              </AdminRoute>
+            }
+          />
+
+          {/* 404 처리 */}
+          <Route path="*" element={<Navigate to="/chat" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}

@@ -16,11 +16,11 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "drizzle-orm": "^0.30.0",
-    "postgres": "^3.4.0"
+    "drizzle-orm": "^0.45.2",    "drizzle-zod": "^0.7.0",    "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.20.0",
+    "@types/node": "^20.0.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.7.0"
   }
 }
