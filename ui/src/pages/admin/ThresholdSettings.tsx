@@ -39,6 +39,7 @@ function SliderRow({
   label,
   value,
   onChange,
+  onCommit,
   min,
   max,
   color,
@@ -47,6 +48,8 @@ function SliderRow({
   label: string;
   value: number;
   onChange: (v: number) => void;
+  // 개선②: 마우스 드롭 시 자동 저장 콜백
+  onCommit?: () => void;
   min?: number;
   max?: number;
   color: string;
@@ -64,6 +67,9 @@ function SliderRow({
         max={max ?? 100}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        // 마우스/터치 드롭 시 저장 트리거 (이동 중에는 로컬 상태만 변경)
+        onMouseUp={onCommit}
+        onTouchEnd={onCommit}
         className="w-full accent-blue-500"
       />
       {hint && <p className="text-xs text-gray-400">{hint}</p>}
@@ -130,6 +136,11 @@ export default function ThresholdSettings() {
   const weightSum = form.attendanceWeight + form.assignmentWeight + form.commitWeight;
   const weightValid = weightSum === 100;
 
+  // 개선②: 슬라이더 드롭(onMouseUp/onTouchEnd) 시 자동 저장
+  const autoSave = () => {
+    if (form && weightValid) mutation.mutate(form);
+  };
+
   const update = (key: keyof Thresholds) => (v: number) =>
     setForm((prev) => prev ? { ...prev, [key]: v } : prev);
 
@@ -154,6 +165,7 @@ export default function ThresholdSettings() {
           label="📋 출결 가중치"
           value={form.attendanceWeight}
           onChange={update('attendanceWeight')}
+          onCommit={autoSave}
           color="text-blue-600"
           hint="출결 점수가 EWS 총점에 반영되는 비중"
         />
@@ -161,6 +173,7 @@ export default function ThresholdSettings() {
           label="📝 과제 제출 가중치"
           value={form.assignmentWeight}
           onChange={update('assignmentWeight')}
+          onCommit={autoSave}
           color="text-indigo-600"
           hint="과제 제출율이 EWS 총점에 반영되는 비중"
         />
@@ -168,6 +181,7 @@ export default function ThresholdSettings() {
           label="🔗 GitHub 커밋 가중치"
           value={form.commitWeight}
           onChange={update('commitWeight')}
+          onCommit={autoSave}
           color="text-purple-600"
           hint="GitHub 커밋 활동이 EWS 총점에 반영되는 비중"
         />
@@ -189,6 +203,7 @@ export default function ThresholdSettings() {
           label="⚠️ 위험 판정 기준 점수"
           value={form.riskThreshold}
           onChange={update('riskThreshold')}
+          onCommit={autoSave}
           min={0}
           max={100}
           color="text-yellow-600"
@@ -198,6 +213,7 @@ export default function ThresholdSettings() {
           label="🚨 심각 판정 기준 점수"
           value={form.criticalThreshold}
           onChange={update('criticalThreshold')}
+          onCommit={autoSave}
           min={0}
           max={100}
           color="text-red-600"
@@ -207,6 +223,7 @@ export default function ThresholdSettings() {
           label="📣 Slack 에스컬레이션 점수"
           value={form.slackEscalateScore}
           onChange={update('slackEscalateScore')}
+          onCommit={autoSave}
           min={0}
           max={100}
           color="text-orange-600"

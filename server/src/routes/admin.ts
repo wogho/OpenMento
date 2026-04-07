@@ -15,6 +15,7 @@ import {
   counselingNotes,
   consultationBookings,
   conversationMessages,
+  auditLogs,
   students,
   routines,
   routineTriggers,
@@ -543,6 +544,21 @@ router.put('/ews/scores/:scoreId/feedback', async (req, res) => {
     })
     .where(eq(ewsRiskScores.id, scoreId));
 
+  // 개선③: 허위 양성 피드백 감사 로그 기록
+  await db.insert(auditLogs).values({
+    institutionId,
+    actorId: req.user!.sub,
+    actorType: 'instructor',
+    action: 'write',
+    resourceType: 'ews_feedback',
+    resourceId: scoreId,
+    metadata: {
+      isFalsePositive: parsed.data.isFalsePositive,
+      hasNote: !!parsed.data.instructorNote,
+    },
+    ipAddress: req.ip ?? null,
+  });
+
   res.json({ success: true, scoreId, isFalsePositive: parsed.data.isFalsePositive });
 });
 
@@ -593,6 +609,22 @@ router.post('/ews/counseling', async (req, res) => {
       counseledAt: parsed.data.counseledAt ? new Date(parsed.data.counseledAt) : new Date(),
     })
     .returning();
+
+  // 개선③: 강사 수동 개입 감사 로그 기록 (Human-in-the-loop 추적)
+  await db.insert(auditLogs).values({
+    institutionId,
+    actorId: req.user!.sub,
+    actorType: 'instructor',
+    action: 'write',
+    resourceType: 'ews_counseling',
+    resourceId: note.id,
+    metadata: {
+      studentId: parsed.data.studentId,
+      sentiment: parsed.data.sentiment,
+      hasSummary: !!parsed.data.summary,
+    },
+    ipAddress: req.ip ?? null,
+  });
 
   res.status(201).json({ success: true, note });
 });
@@ -669,6 +701,22 @@ router.post('/ews/consultations', async (req, res) => {
       status: 'pending',
     })
     .returning();
+
+  // 개선③: 상담 예약 즉시 생성 감사 로그 기록
+  await db.insert(auditLogs).values({
+    institutionId,
+    actorId: req.user!.sub,
+    actorType: 'instructor',
+    action: 'write',
+    resourceType: 'ews_consultation',
+    resourceId: booking.id,
+    metadata: {
+      studentId: parsed.data.studentId,
+      courseId: parsed.data.courseId,
+      triggeredByScoreId: parsed.data.triggeredByScoreId ?? null,
+    },
+    ipAddress: req.ip ?? null,
+  });
 
   res.status(201).json({ success: true, booking });
 });
