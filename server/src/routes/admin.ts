@@ -20,6 +20,7 @@ import {
   routines,
   routineTriggers,
   costEvents,
+  budgetPolicies,
   attendanceLogs,
   eq,
   and,
@@ -1115,6 +1116,151 @@ router.put('/thresholds', (req, res) => {
 
   thresholdsStore.set(institutionId, updated);
   res.json(updated);
+});
+
+// ─── 예산 관리 API (Phase 2-7) ───────────────────────────────────────────────
+
+// GET /admin/budget — 이번 달 소비 현황 조회 (전체 + 에이전트별 breakdown)
+router.get('/budget', async (req, res) => {
+  const { institutionId } = req.user!;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  // 이번 달 전체 비용 + 에이전트별 breakdown
+  const rows = await db
+    .select({
+      agentId: costEvents.agentId,
+      model: costEvents.model,
+      provider: costEvents.provider,
+      totalCostUsd: sql<number>`SUM(${costEvents.costUsd})::float`,
+      totalInputTokens: sql<number>`SUM(${costEvents.promptTokens})::int`,
+      totalOutputTokens: sql<number>`SUM(${costEvents.completionTokens})::int`,
+      callCount: sql<number>`COUNT(*)::int`,
+    })
+    .from(costEvents)
+    .where(
+      and(
+        eq(costEvents.institutionId, institutionId),
+        gte(costEvents.createdAt, monthStart),
+        lte(costEvents.createdAt, monthEnd),
+      ),
+    )
+    .groupBy(costEvents.agentId, costEvents.model, costEvents.provider)
+    .orderBy(sql`SUM(${costEvents.costUsd}) DESC`);
+
+  const totalCostUsd = rows.reduce((sum, r) => sum + (r.totalCostUsd ?? 0), 0);
+
+  // 기관 전체 정책 조회 (limitUsd 게이지 계산용)
+  const [globalPolicy] = await db
+    .select()
+    .from(budgetPolicies)
+    .where(
+      and(
+        eq(budgetPolicies.institutionId, institutionId),
+        isNull(budgetPolicies.agentId),
+        eq(budgetPolicies.isActive, 'true'),
+      ),
+    )
+    .limit(1);
+
+  res.json({
+    month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+    totalCostUsd,
+    limitUsd: globalPolicy?.limitUsd ?? null,
+    alertThresholdPct: globalPolicy?.alertThresholdPct ?? 80,
+    onExceed: globalPolicy?.onExceed ?? 'pause',
+    usagePct: globalPolicy ? (totalCostUsd / globalPolicy.limitUsd) * 100 : null,
+    breakdown: rows,
+  });
+});
+
+// GET /admin/budget/policies — 예산 정책 목록 조회
+router.get('/budget/policies', async (req, res) => {
+  const { institutionId } = req.user!;
+
+  const policies = await db
+    .select()
+    .from(budgetPolicies)
+    .where(eq(budgetPolicies.institutionId, institutionId))
+    .orderBy(desc(budgetPolicies.createdAt));
+
+  res.json({ policies });
+});
+
+// PUT /admin/budget — 기관 전체 예산 정책 upsert
+const budgetPolicySchema = z.object({
+  limitUsd: z.number().positive(),
+  period: z.enum(['monthly', 'weekly', 'daily']).default('monthly'),
+  alertThresholdPct: z.number().int().min(1).max(99).default(80),
+  onExceed: z.enum(['pause', 'alert_only']).default('pause'),
+});
+
+router.put('/budget', async (req, res) => {
+  const { institutionId } = req.user!;
+
+  const parsed = budgetPolicySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  const { limitUsd, period, alertThresholdPct, onExceed } = parsed.data;
+
+  // 기존 기관 전체(agentId IS NULL) 정책 존재 여부 확인
+  const [existing] = await db
+    .select({ id: budgetPolicies.id })
+    .from(budgetPolicies)
+    .where(
+      and(
+        eq(budgetPolicies.institutionId, institutionId),
+        isNull(budgetPolicies.agentId),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(budgetPolicies)
+      .set({ limitUsd, period, alertThresholdPct, onExceed, isActive: 'true', updatedAt: new Date() })
+      .where(eq(budgetPolicies.id, existing.id));
+  } else {
+    await db.insert(budgetPolicies).values({
+      institutionId,
+      limitUsd,
+      period,
+      alertThresholdPct,
+      onExceed,
+      isActive: 'true',
+    });
+  }
+
+  res.json({ success: true, limitUsd, period, alertThresholdPct, onExceed });
+});
+
+// GET /admin/budget/cost-events — 최근 비용 이벤트 목록 (최대 100건)
+router.get('/budget/cost-events', async (req, res) => {
+  const { institutionId } = req.user!;
+  const limit = Math.min(Number(req.query['limit'] ?? 100), 200);
+
+  const events = await db
+    .select({
+      id: costEvents.id,
+      agentId: costEvents.agentId,
+      provider: costEvents.provider,
+      model: costEvents.model,
+      promptTokens: costEvents.promptTokens,
+      completionTokens: costEvents.completionTokens,
+      costUsd: costEvents.costUsd,
+      createdAt: costEvents.createdAt,
+    })
+    .from(costEvents)
+    .where(eq(costEvents.institutionId, institutionId))
+    .orderBy(desc(costEvents.createdAt))
+    .limit(limit);
+
+  res.json({ events });
 });
 
 export default router;

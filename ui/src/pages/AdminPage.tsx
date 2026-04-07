@@ -21,6 +21,7 @@ import InstructorDashboard from './admin/InstructorDashboard';
 import ScheduleSettings from './admin/ScheduleSettings';
 import ThresholdSettings from './admin/ThresholdSettings';
 import NotificationSettings from './admin/NotificationSettings';
+import BudgetManagement from './admin/BudgetManagement';
 
 type AdminTab =
   | 'principal'
@@ -30,6 +31,7 @@ type AdminTab =
   | 'schedule'
   | 'thresholds'
   | 'notifications'
+  | 'budget'
   | 'secrets';
 
 export default function AdminPage() {
@@ -50,6 +52,7 @@ export default function AdminPage() {
     { id: 'schedule',      label: '스케줄 설정',     icon: '📅', group: '설정' },
     { id: 'thresholds',    label: 'EWS 임계치',      icon: '🎚️', group: '설정' },
     { id: 'notifications', label: '알림 채널',       icon: '🔔', group: '설정' },
+    { id: 'budget',        label: '예산 관리',       icon: '💰', group: '설정' },
     { id: 'secrets',       label: '보안 키 관리',    icon: '🔑', group: '설정' },
   ];
 
@@ -120,6 +123,7 @@ export default function AdminPage() {
                activeTab === 'schedule'      ? '루틴 스케줄 활성화 및 크론 표현식 관리' :
                activeTab === 'thresholds'    ? 'EWS 점수 가중치 · 위험 판정 기준 조정' :
                activeTab === 'notifications' ? 'Slack Webhook URL · 에스컬레이션 정책' :
+               activeTab === 'budget'        ? 'LLM 토큰 비용 추적 · 월 예산 한도 · Soft Alert 설정' :
                '외부 연동 API 암호화 센터'}
             </p>
           </header>
@@ -133,6 +137,7 @@ export default function AdminPage() {
             {activeTab === 'schedule'      && <ScheduleSettings />}
             {activeTab === 'thresholds'    && <ThresholdSettings />}
             {activeTab === 'notifications' && <NotificationSettings />}
+            {activeTab === 'budget'        && <BudgetManagement />}
             {activeTab === 'secrets'       && <SecretsManager />}
           </div>
         </div>

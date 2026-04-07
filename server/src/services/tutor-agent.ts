@@ -16,6 +16,7 @@ import { searchSimilarChunks } from '@educlip/rag';
 import { buildSystemPrompt } from './prompts.js';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';
+import { recordCostEvent } from './budget-guard.js';
 
 // ── 타입 ─────────────────────────────────────────────────────────────────
 export interface TutorChatOptions {
@@ -161,6 +162,16 @@ export async function tutorChat(options: TutorChatOptions): Promise<TutorChatRes
       outputTokens: llmResponse.outputTokens,
     },
     turnIndex: nextTurnIndex + 1,
+  });
+
+  // ── 9. 비용 이벤트 기록 (fire-and-forget) ────────────────────────────
+  void recordCostEvent({
+    institutionId,
+    agentId,
+    provider: adapterConfig.provider,
+    model: llmResponse.model,
+    inputTokens: llmResponse.inputTokens,
+    outputTokens: llmResponse.outputTokens,
   });
 
   return {

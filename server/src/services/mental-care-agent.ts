@@ -26,6 +26,7 @@
 import { db, agents, conversationMessages, eq, and, isNull, desc } from '@educlip/db';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig } from '../adapters/index.js';
+import { recordCostEvent } from './budget-guard.js';
 
 // ── 공감 메시지 템플릿 풀 ─────────────────────────────────────────────────────
 // LLM 설정이 없거나 실패 시 랜덤 선택하여 사용합니다.
@@ -116,6 +117,15 @@ export async function sendMentalCareMessage(
             inputTokens: result.inputTokens,
             outputTokens: result.outputTokens,
           };
+          // 비용 이벤트 기록 (fire-and-forget)
+          void recordCostEvent({
+            institutionId,
+            agentId: careAgent.id,
+            provider: adapterConfig.provider,
+            model: result.model,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+          });
         }
       } catch (err) {
         // LLM 실패 → 템플릿 계속 사용 (이미 pickRandomTemplate() 로 설정됨)

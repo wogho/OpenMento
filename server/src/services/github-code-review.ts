@@ -27,6 +27,7 @@ import { db, agents, conversationMessages, eq, and, isNull } from '@educlip/db';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';
 import { logger } from '../utils/logger.js';
+import { recordCostEvent } from './budget-guard.js';
 
 // ── Zod 런타임 검증 스키마 ② ────────────────────────────────────────────────
 
@@ -252,6 +253,16 @@ export async function generateCodeReview(
     },
     '[github-review] 코드 리뷰 생성 완료',
   );
+
+  // ── 5. 비용 이벤트 기록 (fire-and-forget) ────────────────────────────
+  void recordCostEvent({
+    institutionId: req.institutionId,
+    agentId: req.agentId,
+    provider: adapterConfig.provider,
+    model: response.model,
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+  });
 
   return {
     sessionId,
