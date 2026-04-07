@@ -31,7 +31,7 @@ import {
   desc,
   gte,
   lte,
-  lt,
+
 } from '@educlip/db';
 import { invalidateSkillCache, importSkillFromGitHub } from '../services/skill-injector.js';
 import { ConnectorRegistry } from '../mcp/registry.js';

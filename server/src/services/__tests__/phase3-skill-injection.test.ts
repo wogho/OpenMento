@@ -176,9 +176,9 @@ describe('[Phase 3-1] buildSystemPrompt — 강사 스킬 주입', () => {
         chunkIndex: 0,
         score: 0.9,
       },
-    ];
+    ] as any; // RAG 인터페이스를 맞추기 위해 강제 캐스팅 (lint 무시) // eslint-disable-line @typescript-eslint/no-explicit-any
     const skillMd = '# 코드 리뷰 규칙\n- 변수명에 의미를 담아라';
-    const prompt = buildSystemPrompt(ragResults as any, skillMd);
+    const prompt = buildSystemPrompt(ragResults, skillMd);
     expect(prompt).toContain('강사 지정 규칙');
     expect(prompt).toContain('교재 컨텍스트');
     expect(prompt).toContain('재귀 함수');
