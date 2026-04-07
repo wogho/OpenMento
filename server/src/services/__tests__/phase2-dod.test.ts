@@ -16,12 +16,13 @@
  *         (DB 접근 없이 순수 함수로 검증)
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { classifyRiskLevel } from '../ews-monitor.js';
 import {
   getEwsThresholds,
   setEwsThresholds,
   DEFAULT_EWS_THRESHOLDS,
+  _resetForTest,
 } from '../ews-thresholds.js';
 
 // ── DoD① EWS 기본 임계치(60/75/90) 분류 검증 ──────────────────────────────────
@@ -64,9 +65,13 @@ describe('DoD① EWS 기본 임계치 분류', () => {
 describe('DoD② GUI 임계치 변경 즉시 반영', () => {
   const INST = 'test-institution-dod2';
 
-  afterEach(() => {
+  beforeEach(() => {
+    _resetForTest(); // DB 없이 캐시만 사용하는 테스트 환경 초기화
+  });
+
+  afterEach(async () => {
     // 테스트 후 기본값으로 리셋
-    setEwsThresholds(INST, { ...DEFAULT_EWS_THRESHOLDS });
+    await setEwsThresholds(INST, { ...DEFAULT_EWS_THRESHOLDS });
   });
 
   it('임계치 변경 전: 기본 기준(60/75/90) 사용', () => {
@@ -74,8 +79,8 @@ describe('DoD② GUI 임계치 변경 즉시 반영', () => {
     expect(classifyRiskLevel(80, INST)).toBe('high_risk');
   });
 
-  it('임계치 변경: warningThreshold=50, highRiskThreshold=70, criticalThreshold=85', () => {
-    setEwsThresholds(INST, {
+  it('임계치 변경: warningThreshold=50, highRiskThreshold=70, criticalThreshold=85', async () => {
+    await setEwsThresholds(INST, {
       warningThreshold:  50,
       highRiskThreshold: 70,
       criticalThreshold: 85,
@@ -91,8 +96,8 @@ describe('DoD② GUI 임계치 변경 즉시 반영', () => {
     expect(classifyRiskLevel(85, INST)).toBe('critical');
   });
 
-  it('getEwsThresholds가 변경된 임계치를 반환', () => {
-    setEwsThresholds(INST, { criticalThreshold: 95 });
+  it('getEwsThresholds가 변경된 임계치를 반환', async () => {
+    await setEwsThresholds(INST, { criticalThreshold: 95 });
     const t = getEwsThresholds(INST);
     expect(t.criticalThreshold).toBe(95);
     // 나머지는 기본값 유지

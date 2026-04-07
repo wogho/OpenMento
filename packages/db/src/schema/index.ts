@@ -6,6 +6,7 @@ export * from './attendance_logs.js';
 export * from './assignment_submissions.js';
 export * from './counseling_notes.js';
 export * from './ews_risk_scores.js';
+export * from './ews_settings.js';
 export * from './consultation_bookings.js';
 export * from './rag_documents.js';
 export * from './portfolio_projects.js';

@@ -1068,7 +1068,7 @@ const thresholdsSchema = z.object({
 });
 
 // PUT /admin/thresholds — EWS 임계치 변경
-router.put('/thresholds', (req, res) => {
+router.put('/thresholds', async (req, res) => {
   const { institutionId } = req.user!;
 
   const parsed = thresholdsSchema.safeParse(req.body);
@@ -1077,7 +1077,7 @@ router.put('/thresholds', (req, res) => {
     return;
   }
 
-  const updated = setEwsThresholds(institutionId, parsed.data);
+  const updated = await setEwsThresholds(institutionId, parsed.data);
   res.json(updated);
 });
 

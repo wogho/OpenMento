@@ -10,6 +10,7 @@ import webhookRouter from './routes/webhook.js';
 import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
 import { startWebhookWorker, closeWebhookWorker } from './queues/webhook.worker.js';
+import { initEwsThresholdsDb, loadEwsThresholdsFromDb } from './services/ews-thresholds.js';
 import { closeWebhookQueue } from './queues/webhook.queue.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
@@ -82,6 +83,15 @@ createSocketServer(httpServer);
 
 httpServer.listen(PORT, () => {
   logger.info({ port: PORT }, '[api] EduClip server listening');
+  // ── EWS 임계치 DB 연결 + 프리워밍 (Phase 2 개선: 영속성 확보) ─
+  // DB 인스턴스를 주입하고 저장된 모든 기관 임계치를 캐시에 적재합니다.
+  // DB 접근 실패 시 기본값(60/75/90)으로 폴백하므로 서버 기동이 중단되지 않습니다.
+  void (async () => {
+    const { db } = await import('@educlip/db');
+    initEwsThresholdsDb(db);
+    await loadEwsThresholdsFromDb();
+    logger.info('[ews-thresholds] DB 프리워밍 완료');
+  })();
   // ── Heartbeat 스케줄러 기동 (Phase 2-1) ─────────────────────
   startHeartbeatScheduler();
   // ── BullMQ Webhook Worker 기동 (Phase 2-5 개선 ①) ───────────
