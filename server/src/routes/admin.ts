@@ -16,12 +16,18 @@ import {
   consultationBookings,
   conversationMessages,
   students,
+  routines,
+  routineTriggers,
+  costEvents,
+  attendanceLogs,
   eq,
   and,
   isNull,
   sql,
   desc,
   gte,
+  lte,
+  lt,
 } from '@educlip/db';
 import { ConnectorRegistry } from '../mcp/registry.js';
 import { withAuditLog } from '../mcp/audit.js';
@@ -39,6 +45,28 @@ router.use(requireRole('admin'));
 // process.env 업데이트를 통해 LLM 어댑터가 즉시 새 키를 사용할 수 있도록 함
 // Phase 2 이후 DB 암호화 저장으로 전환 예정
 const secretsStore = new Map<string, string>();
+
+// ─── EWS 임계치 인메모리 저장소 ──────────────────────────────────────────────
+// phase 2 범위: 인메모리 기본값; phase 3에서 DB 기반 기관별 설정으로 전환 예정
+interface EwsThresholds {
+  attendanceWeight: number;    // 출결 점수 가중치 (0-100)
+  assignmentWeight: number;    // 과제 제출 가중치
+  commitWeight: number;        // GitHub 커밋 가중치
+  riskThreshold: number;       // 위험 판정 기준 점수 (0-100)
+  criticalThreshold: number;   // 심각 위험 기준 점수
+  slackEscalateScore: number;  // Slack 에스컬레이션 트리거 점수
+}
+
+const DEFAULT_THRESHOLDS: EwsThresholds = {
+  attendanceWeight: 40,
+  assignmentWeight: 35,
+  commitWeight: 25,
+  riskThreshold: 60,
+  criticalThreshold: 80,
+  slackEscalateScore: 75,
+};
+
+const thresholdsStore = new Map<string, EwsThresholds>(); // institutionId → thresholds
 
 // multer: OS tmpdir 디스크 스토리지 — worker_threads 기반 ingestDocument()가 파일 경로를 요구함
 // (memoryStorage()는 req.file.path = undefined → pipeline에서 ENOENT 발생)
@@ -597,6 +625,54 @@ router.post('/ews/slack-test', slackTestLimiter, async (req, res) => {
   res.json({ success: true, message: 'Slack 테스트 메시지가 성공적으로 발송되었습니다.' });
 });
 
+// POST /admin/ews/consultations — 상담 예약 즉시 생성 (강사 Quick Action용)
+const createConsultationSchema = z.object({
+  studentId: z.string().uuid(),
+  courseId: z.string().uuid(),
+  triggeredByScoreId: z.string().uuid().optional(),
+});
+
+router.post('/ews/consultations', async (req, res) => {
+  const { institutionId } = req.user!;
+
+  const parsed = createConsultationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  // 기관 경계 검사: 수강생이 이 기관 소속인지 확인
+  const [student] = await db
+    .select({ id: students.id })
+    .from(students)
+    .where(
+      and(
+        eq(students.id, parsed.data.studentId),
+        eq(students.institutionId, institutionId),
+        isNull(students.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!student) {
+    res.status(403).json({ error: '기관 소속 수강생이 아닙니다.' });
+    return;
+  }
+
+  const [booking] = await db
+    .insert(consultationBookings)
+    .values({
+      institutionId,
+      studentId: parsed.data.studentId,
+      courseId: parsed.data.courseId,
+      triggeredByScoreId: parsed.data.triggeredByScoreId ?? null,
+      status: 'pending',
+    })
+    .returning();
+
+  res.status(201).json({ success: true, booking });
+});
+
 // GET /admin/ews/consultations — 상담 예약 목록 조회
 // 쿼리: ?limit=50&status=pending&studentId=<uuid>
 router.get('/ews/consultations', async (req, res) => {
@@ -755,6 +831,242 @@ router.patch('/ews/mental-care-messages/read-all', async (req, res) => {
   `);
 
   res.json({ success: true, updatedCount: result.length });
+});
+
+// ─── 대시보드 KPI ────────────────────────────────────────────────────────────
+
+// GET /admin/dashboard — 원장 대시보드 KPI 요약
+// 반환: 총 수강생, 위험 수강생 수, 이번 달 AI 비용 합계, 최근 위험 수강생 목록
+router.get('/dashboard', async (req, res) => {
+  const { institutionId } = req.user!;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // 총 활성 수강생
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(students)
+    .where(and(eq(students.institutionId, institutionId), isNull(students.deletedAt)));
+
+  // 위험 수강생 (최근 30일 내 totalScore >= 60인 uniqueStudent)
+  const riskRows = await db
+    .select({
+      studentId: ewsRiskScores.studentId,
+      totalScore: ewsRiskScores.totalScore,
+      calculatedAt: ewsRiskScores.calculatedAt,
+    })
+    .from(ewsRiskScores)
+    .innerJoin(students, eq(ewsRiskScores.studentId, students.id))
+    .where(
+      and(
+        eq(students.institutionId, institutionId),
+        gte(ewsRiskScores.totalScore, 60),
+        gte(ewsRiskScores.calculatedAt, new Date(now.getTime() - 30 * 86400_000)),
+        isNull(ewsRiskScores.isFalsePositive),
+      ),
+    )
+    .orderBy(desc(ewsRiskScores.totalScore));
+
+  // 이번 달 AI 비용 합계 (cost_events)
+  const [costRow] = await db
+    .select({ total: sql<number>`coalesce(sum(${costEvents.costUsd}), 0)::float` })
+    .from(costEvents)
+    .where(
+      and(
+        eq(costEvents.institutionId, institutionId),
+        gte(costEvents.createdAt, monthStart),
+      ),
+    );
+
+  // 이번 달 출결율 집계
+  const [attRow] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      present: sql<number>`sum(case when ${attendanceLogs.status} = 'present' or ${attendanceLogs.status} = 'late' then 1 else 0 end)::int`,
+    })
+    .from(attendanceLogs)
+    .innerJoin(students, eq(attendanceLogs.studentId, students.id))
+    .where(
+      and(
+        eq(students.institutionId, institutionId),
+        gte(attendanceLogs.attendanceDate, monthStart.toISOString().split('T')[0]),
+        isNull(attendanceLogs.deletedAt),
+      ),
+    );
+
+  const attendanceRate =
+    attRow && attRow.total > 0
+      ? Math.round(((attRow.present ?? 0) / attRow.total) * 100)
+      : null;
+
+  // 중복 제거 후 위험 수강생 수
+  const uniqueRiskStudentIds = new Set(riskRows.map((r) => r.studentId));
+
+  res.json({
+    totalStudents: totalRow?.count ?? 0,
+    atRiskCount: uniqueRiskStudentIds.size,
+    monthlyAiCostUsd: costRow?.total ?? 0,
+    attendanceRate,
+    recentRiskStudents: riskRows.slice(0, 10).map((r) => ({
+      studentId: r.studentId,
+      totalScore: r.totalScore,
+      calculatedAt: r.calculatedAt,
+    })),
+  });
+});
+
+// ─── 루틴(스케줄) 관리 ───────────────────────────────────────────────────────
+
+// GET /admin/routines — 기관 내 루틴 + 트리거 목록 조회
+router.get('/routines', async (req, res) => {
+  const { institutionId } = req.user!;
+
+  const rows = await db
+    .select({
+      id: routines.id,
+      name: routines.name,
+      description: routines.description,
+      isActive: routines.isActive,
+      agentId: routines.agentId,
+      courseId: routines.courseId,
+      createdAt: routines.createdAt,
+      updatedAt: routines.updatedAt,
+      triggerId: routineTriggers.id,
+      triggerKind: routineTriggers.kind,
+      cronExpression: routineTriggers.cronExpression,
+      webhookEvent: routineTriggers.webhookEvent,
+      triggerIsActive: routineTriggers.isActive,
+    })
+    .from(routines)
+    .leftJoin(routineTriggers, eq(routineTriggers.routineId, routines.id))
+    .where(eq(routines.institutionId, institutionId))
+    .orderBy(routines.name);
+
+  // 루틴 단위로 그룹핑 (트리거는 배열)
+  const routineMap = new Map<string, {
+    id: string; name: string; description: string | null;
+    isActive: boolean; agentId: string; courseId: string | null;
+    createdAt: Date; updatedAt: Date;
+    triggers: { id: string; kind: string; cronExpression: string | null; webhookEvent: string | null; isActive: boolean }[];
+  }>();
+
+  for (const row of rows) {
+    if (!routineMap.has(row.id)) {
+      routineMap.set(row.id, {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        isActive: row.isActive,
+        agentId: row.agentId,
+        courseId: row.courseId,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        triggers: [],
+      });
+    }
+    if (row.triggerId) {
+      routineMap.get(row.id)!.triggers.push({
+        id: row.triggerId,
+        kind: row.triggerKind!,
+        cronExpression: row.cronExpression,
+        webhookEvent: row.webhookEvent,
+        isActive: row.triggerIsActive!,
+      });
+    }
+  }
+
+  res.json(Array.from(routineMap.values()));
+});
+
+const routineUpdateSchema = z.object({
+  isActive: z.boolean().optional(),
+  cronExpression: z.string().optional(),
+});
+
+// PUT /admin/routines/:id — 루틴 활성/비활성 + 크론 표현식 변경
+router.put('/routines/:id', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { id } = req.params;
+
+  const parsed = routineUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  // 기관 소속 확인
+  const [routine] = await db
+    .select({ id: routines.id })
+    .from(routines)
+    .where(and(eq(routines.id, id), eq(routines.institutionId, institutionId)))
+    .limit(1);
+
+  if (!routine) {
+    res.status(404).json({ error: '루틴을 찾을 수 없습니다.' });
+    return;
+  }
+
+  const { isActive, cronExpression } = parsed.data;
+
+  if (isActive !== undefined) {
+    await db
+      .update(routines)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(routines.id, id));
+  }
+
+  if (cronExpression !== undefined) {
+    // cron 트리거 업데이트 (없으면 패스 — UI가 트리거 있는 루틴만 편집)
+    await db
+      .update(routineTriggers)
+      .set({ cronExpression })
+      .where(and(eq(routineTriggers.routineId, id), eq(routineTriggers.kind, 'cron')));
+  }
+
+  res.json({ success: true });
+});
+
+// ─── EWS 임계치 관리 ─────────────────────────────────────────────────────────
+
+// GET /admin/thresholds — 현재 EWS 임계치 조회
+router.get('/thresholds', (req, res) => {
+  const { institutionId } = req.user!;
+  const thresholds = thresholdsStore.get(institutionId) ?? { ...DEFAULT_THRESHOLDS };
+  res.json(thresholds);
+});
+
+const thresholdsSchema = z.object({
+  attendanceWeight: z.number().int().min(0).max(100).optional(),
+  assignmentWeight: z.number().int().min(0).max(100).optional(),
+  commitWeight: z.number().int().min(0).max(100).optional(),
+  riskThreshold: z.number().int().min(0).max(100).optional(),
+  criticalThreshold: z.number().int().min(0).max(100).optional(),
+  slackEscalateScore: z.number().int().min(0).max(100).optional(),
+});
+
+// PUT /admin/thresholds — EWS 임계치 변경
+router.put('/thresholds', (req, res) => {
+  const { institutionId } = req.user!;
+
+  const parsed = thresholdsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  const current = thresholdsStore.get(institutionId) ?? { ...DEFAULT_THRESHOLDS };
+  const updated = { ...current, ...parsed.data };
+
+  // 가중치 합계 검증 (세 가중치 합이 100이어야 함)
+  const weightSum = updated.attendanceWeight + updated.assignmentWeight + updated.commitWeight;
+  if (weightSum !== 100) {
+    res.status(400).json({ error: `가중치 합계가 100이어야 합니다. 현재 합계: ${weightSum}` });
+    return;
+  }
+
+  thresholdsStore.set(institutionId, updated);
+  res.json(updated);
 });
 
 export default router;

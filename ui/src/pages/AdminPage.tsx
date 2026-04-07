@@ -1,6 +1,12 @@
 /**
- * 관리자 허브 (Phase 1-5 기준 좌측 사이드바 + 탭 구조)
+ * 관리자 허브 (Phase 2-6 기준 좌측 사이드바 + 탭 구조)
+ * - 원장 대시보드 (PrincipalDashboard)
+ * - 강사 대시보드 (InstructorDashboard)
  * - 교재 관리 (DocumentManager)
+ * - EWS 대시보드 (EwsDashboard)
+ * - 스케줄 설정 (ScheduleSettings)
+ * - EWS 임계치 (ThresholdSettings)
+ * - 알림 채널 (NotificationSettings)
  * - 보안 키 관리 (SecretsManager)
  */
 
@@ -10,23 +16,41 @@ import { useAuth } from '../hooks/useAuth';
 import DocumentManager from './admin/DocumentManager';
 import SecretsManager from './admin/SecretsManager';
 import EwsDashboard from './admin/EwsDashboard';
+import PrincipalDashboard from './admin/PrincipalDashboard';
+import InstructorDashboard from './admin/InstructorDashboard';
+import ScheduleSettings from './admin/ScheduleSettings';
+import ThresholdSettings from './admin/ThresholdSettings';
+import NotificationSettings from './admin/NotificationSettings';
 
-type AdminTab = 'documents' | 'secrets' | 'ews';
+type AdminTab =
+  | 'principal'
+  | 'instructor'
+  | 'documents'
+  | 'ews'
+  | 'schedule'
+  | 'thresholds'
+  | 'notifications'
+  | 'secrets';
 
 export default function AdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<AdminTab>('documents');
+  const [activeTab, setActiveTab] = useState<AdminTab>('principal');
 
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
   };
 
-  const tabs: { id: AdminTab; label: string; icon: string }[] = [
-    { id: 'documents', label: '교재 관리', icon: '📚' },
-    { id: 'secrets',   label: '보안 키 관리', icon: '🔑' },
-    { id: 'ews',       label: 'EWS 대시보드', icon: '🚨' },
+  const tabs: { id: AdminTab; label: string; icon: string; group?: string }[] = [
+    { id: 'principal',     label: '원장 대시보드',   icon: '🏫', group: '대시보드' },
+    { id: 'instructor',    label: '강사 대시보드',   icon: '👨‍🏫', group: '대시보드' },
+    { id: 'ews',           label: 'EWS 대시보드',   icon: '🚨', group: '대시보드' },
+    { id: 'documents',     label: '교재 관리',       icon: '📚', group: '콘텐츠' },
+    { id: 'schedule',      label: '스케줄 설정',     icon: '📅', group: '설정' },
+    { id: 'thresholds',    label: 'EWS 임계치',      icon: '🎚️', group: '설정' },
+    { id: 'notifications', label: '알림 채널',       icon: '🔔', group: '설정' },
+    { id: 'secrets',       label: '보안 키 관리',    icon: '🔑', group: '설정' },
   ];
 
   return (
@@ -89,18 +113,27 @@ export default function AdminPage() {
               {tabs.find((t) => t.id === activeTab)?.label}
             </h1>
             <p className="text-gray-500 text-sm mt-2">
-              EduClip 중앙 관리자 페이지 —{' '}
-              {activeTab === 'documents' ? 'RAG 파이프라인 연동 교재' :
-               activeTab === 'secrets'   ? '외부 연동 API 암호화 센터' :
-               'EWS 위험 감지 · 자동 상담 예약 · 멘탈케어 메시지 확인'}
+              {activeTab === 'principal'     ? '기관 전체 KPI · 위험 수강생 현황' :
+               activeTab === 'instructor'    ? '강사별 수강생 현황 · EWS 허위 양성 처리' :
+               activeTab === 'documents'     ? 'RAG 파이프라인 연동 교재' :
+               activeTab === 'ews'           ? 'EWS 위험 감지 · 자동 상담 예약 · 멘탈케어 메시지' :
+               activeTab === 'schedule'      ? '루틴 스케줄 활성화 및 크론 표현식 관리' :
+               activeTab === 'thresholds'    ? 'EWS 점수 가중치 · 위험 판정 기준 조정' :
+               activeTab === 'notifications' ? 'Slack Webhook URL · 에스컬레이션 정책' :
+               '외부 연동 API 암호화 센터'}
             </p>
           </header>
 
           {/* 콘텐츠 영역 렌더링 */}
           <div className="animate-fade-in">
-            {activeTab === 'documents' && <DocumentManager />}
-            {activeTab === 'secrets'   && <SecretsManager />}
-            {activeTab === 'ews'       && <EwsDashboard />}
+            {activeTab === 'principal'     && <PrincipalDashboard />}
+            {activeTab === 'instructor'    && <InstructorDashboard />}
+            {activeTab === 'documents'     && <DocumentManager />}
+            {activeTab === 'ews'           && <EwsDashboard />}
+            {activeTab === 'schedule'      && <ScheduleSettings />}
+            {activeTab === 'thresholds'    && <ThresholdSettings />}
+            {activeTab === 'notifications' && <NotificationSettings />}
+            {activeTab === 'secrets'       && <SecretsManager />}
           </div>
         </div>
       </main>
