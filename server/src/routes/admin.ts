@@ -35,6 +35,7 @@ import {
 import { ConnectorRegistry } from '../mcp/registry.js';
 import { withAuditLog } from '../mcp/audit.js';
 import { invalidatePricingCache } from '../services/budget-guard.js';
+import { getEwsThresholds, setEwsThresholds } from '../services/ews-thresholds.js';
 import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
@@ -49,28 +50,6 @@ router.use(requireRole('admin'));
 // process.env 업데이트를 통해 LLM 어댑터가 즉시 새 키를 사용할 수 있도록 함
 // Phase 2 이후 DB 암호화 저장으로 전환 예정
 const secretsStore = new Map<string, string>();
-
-// ─── EWS 임계치 인메모리 저장소 ──────────────────────────────────────────────
-// phase 2 범위: 인메모리 기본값; phase 3에서 DB 기반 기관별 설정으로 전환 예정
-interface EwsThresholds {
-  attendanceWeight: number;    // 출결 점수 가중치 (0-100)
-  assignmentWeight: number;    // 과제 제출 가중치
-  commitWeight: number;        // GitHub 커밋 가중치
-  riskThreshold: number;       // 위험 판정 기준 점수 (0-100)
-  criticalThreshold: number;   // 심각 위험 기준 점수
-  slackEscalateScore: number;  // Slack 에스컬레이션 트리거 점수
-}
-
-const DEFAULT_THRESHOLDS: EwsThresholds = {
-  attendanceWeight: 40,
-  assignmentWeight: 35,
-  commitWeight: 25,
-  riskThreshold: 60,
-  criticalThreshold: 80,
-  slackEscalateScore: 75,
-};
-
-const thresholdsStore = new Map<string, EwsThresholds>(); // institutionId → thresholds
 
 // multer: OS tmpdir 디스크 스토리지 — worker_threads 기반 ingestDocument()가 파일 경로를 요구함
 // (memoryStorage()는 req.file.path = undefined → pipeline에서 ENOENT 발생)
@@ -250,11 +229,6 @@ router.put('/secrets', (req, res) => {
   }
 
   res.json({ message: '보안 키가 저장되었습니다.' });
-});
-
-// PUT /admin/thresholds — EWS 임계치 설정 (Phase 2)
-router.put('/thresholds', (_req, res) => {
-  res.status(501).json({ message: 'Phase 2에서 구현 예정' });
 });
 
 // ── Heartbeat 스케줄러 관련 엔드포인트 (Phase 2-1) ──────────────────────────
@@ -1083,15 +1057,12 @@ router.put('/routines/:id', async (req, res) => {
 // GET /admin/thresholds — 현재 EWS 임계치 조회
 router.get('/thresholds', (req, res) => {
   const { institutionId } = req.user!;
-  const thresholds = thresholdsStore.get(institutionId) ?? { ...DEFAULT_THRESHOLDS };
-  res.json(thresholds);
+  res.json(getEwsThresholds(institutionId));
 });
 
 const thresholdsSchema = z.object({
-  attendanceWeight: z.number().int().min(0).max(100).optional(),
-  assignmentWeight: z.number().int().min(0).max(100).optional(),
-  commitWeight: z.number().int().min(0).max(100).optional(),
-  riskThreshold: z.number().int().min(0).max(100).optional(),
+  warningThreshold:  z.number().int().min(0).max(100).optional(),
+  highRiskThreshold: z.number().int().min(0).max(100).optional(),
   criticalThreshold: z.number().int().min(0).max(100).optional(),
   slackEscalateScore: z.number().int().min(0).max(100).optional(),
 });
@@ -1106,17 +1077,7 @@ router.put('/thresholds', (req, res) => {
     return;
   }
 
-  const current = thresholdsStore.get(institutionId) ?? { ...DEFAULT_THRESHOLDS };
-  const updated = { ...current, ...parsed.data };
-
-  // 가중치 합계 검증 (세 가중치 합이 100이어야 함)
-  const weightSum = updated.attendanceWeight + updated.assignmentWeight + updated.commitWeight;
-  if (weightSum !== 100) {
-    res.status(400).json({ error: `가중치 합계가 100이어야 합니다. 현재 합계: ${weightSum}` });
-    return;
-  }
-
-  thresholdsStore.set(institutionId, updated);
+  const updated = setEwsThresholds(institutionId, parsed.data);
   res.json(updated);
 });
 

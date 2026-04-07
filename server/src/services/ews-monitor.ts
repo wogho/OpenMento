@@ -47,6 +47,7 @@ import {
   ewsRiskScores,
 } from '@educlip/db';
 import type { Agent } from '@educlip/db';
+import { getEwsThresholds } from './ews-thresholds.js';
 
 // ── 상수 ────────────────────────────────────────────────────────────────────
 
@@ -139,10 +140,22 @@ function scoreTutorUsage(thisWeek: number, lastWeek: number): number {
   return WEIGHT_TUTOR_USAGE;                                            // 완전 중단
 }
 
-export function classifyRiskLevel(score: number): EwsScoreResult['riskLevel'] {
-  if (score >= 90) return 'critical';
-  if (score >= 75) return 'high_risk';
-  if (score >= 60) return 'warning';
+/**
+ * 위험 등급을 분류합니다.
+ *
+ * institutionId를 전달하면 GUI에서 설정한 기관별 임계치를 사용합니다.
+ * 생략(테스트·단순 호출)하면 기본값(60/75/90)을 사용합니다.
+ */
+export function classifyRiskLevel(
+  score: number,
+  institutionId?: string,
+): EwsScoreResult['riskLevel'] {
+  const thresholds = institutionId
+    ? getEwsThresholds(institutionId)
+    : { warningThreshold: 60, highRiskThreshold: 75, criticalThreshold: 90 };
+  if (score >= thresholds.criticalThreshold)  return 'critical';
+  if (score >= thresholds.highRiskThreshold)  return 'high_risk';
+  if (score >= thresholds.warningThreshold)   return 'warning';
   return 'normal';
 }
 
@@ -446,7 +459,7 @@ export async function runEwsMonitor(
       };
       const totalScore = components.attendance + components.assignment +
                          components.counseling + components.tutorUsage;
-      const riskLevel  = classifyRiskLevel(totalScore);
+      const riskLevel  = classifyRiskLevel(totalScore, agent.institutionId);
 
       scoresToInsert.push({
         studentId:       student.id,
