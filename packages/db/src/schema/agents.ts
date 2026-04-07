@@ -35,6 +35,9 @@ export const agents = pgTable('agents', {
   adapterConfig: jsonb('adapter_config').notNull(),
   fallbackAdapterConfig: jsonb('fallback_adapter_config'),
   isActive: boolean('is_active').notNull().default(true),
+  // 예산 초과로 자동 비활성화된 시각 (NULL = 수동 비활성 또는 활성 상태)
+  // 월별 자동 재활성화 Cron이 이 필드를 기준으로 복구 대상 식별
+  budgetPausedAt: timestamp('budget_paused_at', { withTimezone: true }),
   // System Prompt 기본값 (스킬 파일로 동적 오버라이드)
   systemPrompt: text('system_prompt'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

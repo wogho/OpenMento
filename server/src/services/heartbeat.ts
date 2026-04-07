@@ -17,7 +17,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { eq, and, isNull, lt, sql } from '@educlip/db';
+import { eq, and, isNull, isNotNull, lt, sql } from '@educlip/db';
 import {
   db,
   agents,
@@ -448,6 +448,35 @@ async function retryProcessLossRuns(): Promise<void> {
  * 현재 분에 매칭되는 모든 활성 cron 트리거를 조회하여 해당 에이전트를 기동합니다.
  * setInterval 1분마다 호출됩니다.
  */
+
+// ── 개선① 월별 예산 정지 에이전트 자동 재활성화 ──────────────────────────────
+
+/**
+ * 예산 초과로 비활성화된 에이전트를 새 달 시작 시 자동 복구합니다.
+ *
+ * 조건: `budget_paused_at IS NOT NULL` (예산 정지) AND `is_active = false`
+ * 호출: `scanAndDispatch()` — 매달 1일 00:00 에만 실행
+ */
+async function reactivateBudgetPausedAgents(): Promise<void> {
+  try {
+    const result = await db
+      .update(agents)
+      .set({ isActive: true, budgetPausedAt: null })
+      .where(
+        and(
+          eq(agents.isActive, false),
+          isNotNull(agents.budgetPausedAt),
+        ),
+      );
+    logger.info(
+      { count: (result as unknown as { rowCount?: number }).rowCount ?? 0 },
+      '[heartbeat] 월별 예산 정지 에이전트 재활성화 완료',
+    );
+  } catch (err) {
+    logger.error({ err }, '[heartbeat] 예산 정지 에이전트 재활성화 실패');
+  }
+}
+
 async function scanAndDispatch(now: Date): Promise<void> {
   // ── 활성 cron 트리거 + 루틴 + 에이전트 조인 조회 ────────────
   const activeTriggers = await db
@@ -467,6 +496,11 @@ async function scanAndDispatch(now: Date): Promise<void> {
         isNull(sql`NULL`), // 플레이스홀더 (항상 참, 추후 기관 필터 추가 시 교체)
       ),
     );
+
+  // 개선①: 매달 1일 00:00 — 예산 초과로 중지된 에이전트 자동 재활성화
+  if (now.getDate() === 1 && now.getHours() === 0 && now.getMinutes() === 0) {
+    void reactivateBudgetPausedAgents();
+  }
 
   for (const trigger of activeTriggers) {
     if (!trigger.cronExpression) continue;

@@ -43,6 +43,13 @@
       "when": 1775508692858,
       "tag": "0005_github_repo_students",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775572512205,
+      "tag": "0008_oval_chronomancer",
+      "breakpoints": true
     }
   ]
 }

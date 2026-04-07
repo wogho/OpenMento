@@ -21,6 +21,7 @@ import {
   routineTriggers,
   costEvents,
   budgetPolicies,
+  modelPricing,
   attendanceLogs,
   eq,
   and,
@@ -33,6 +34,7 @@ import {
 } from '@educlip/db';
 import { ConnectorRegistry } from '../mcp/registry.js';
 import { withAuditLog } from '../mcp/audit.js';
+import { invalidatePricingCache } from '../services/budget-guard.js';
 import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
@@ -1261,6 +1263,68 @@ router.get('/budget/cost-events', async (req, res) => {
     .limit(limit);
 
   res.json({ events });
+});
+
+// ── 개선④ 모델 단가 관리 API ──────────────────────────────────────────────────
+
+// GET /admin/budget/pricing — 모델별 단가 목록 조회
+router.get('/budget/pricing', async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(modelPricing)
+    .orderBy(modelPricing.provider, modelPricing.model);
+  res.json({ pricing: rows });
+});
+
+// PUT /admin/budget/pricing — 단가 upsert (등록 또는 수정)
+const pricingSchema = z.object({
+  provider:    z.string().min(1).max(50),
+  model:       z.string().min(1).max(100),
+  inputPer1k:  z.number().nonnegative(),
+  outputPer1k: z.number().nonnegative(),
+  isActive:    z.boolean().default(true),
+});
+
+router.put('/budget/pricing', async (req, res) => {
+  const parsed = pricingSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const { provider, model, inputPer1k, outputPer1k, isActive } = parsed.data;
+
+  const [row] = await db
+    .insert(modelPricing)
+    .values({ provider, model, inputPer1k, outputPer1k, isActive })
+    .onConflictDoUpdate({
+      target: [modelPricing.provider, modelPricing.model],
+      set: { inputPer1k, outputPer1k, isActive, updatedAt: new Date() },
+    })
+    .returning();
+
+  // 단가 캐시 즉시 무효화 — 다음 LLM 호출부터 새 단가 적용
+  invalidatePricingCache();
+
+  res.status(200).json({ pricing: row });
+});
+
+// DELETE /admin/budget/pricing/:id — 단가 비활성화 (소프트 삭제)
+router.delete('/budget/pricing/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const [row] = await db
+    .update(modelPricing)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(modelPricing.id, id))
+    .returning({ id: modelPricing.id });
+
+  if (!row) {
+    res.status(404).json({ error: 'pricing entry not found' });
+    return;
+  }
+
+  invalidatePricingCache();
+  res.status(200).json({ deleted: id });
 });
 
 export default router;

@@ -5,8 +5,10 @@ import {
   uuid,
   integer,
   real,
+  boolean,
   pgEnum,
   index,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { agents } from './agents.js';
@@ -86,3 +88,22 @@ export type BudgetPolicy = typeof budgetPolicies.$inferSelect;
 export type NewBudgetPolicy = typeof budgetPolicies.$inferInsert;
 export type CostEvent = typeof costEvents.$inferSelect;
 export type NewCostEvent = typeof costEvents.$inferInsert;
+
+// ── 모델 단가 테이블 (Phase 2-7 개선④: DB 기반 요금표 관리) ──────────────────
+// GUI에서 요금표를 수정할 수 있어 재배포 없이 단가를 갱신합니다.
+// 미등록 모델은 budget-guard.ts에 내장된 DEFAULT_PRICING을 폴백으로 사용합니다.
+export const modelPricing = pgTable('model_pricing', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  provider: text('provider').notNull(), // 'openai' | 'anthropic'
+  model: text('model').notNull(),       // 'gpt-4o', 'claude-3-5-sonnet-20241022' 등
+  // USD per 1,000 tokens
+  inputPer1k: real('input_per_1k').notNull(),
+  outputPer1k: real('output_per_1k').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique('model_pricing_provider_model_uidx').on(table.provider, table.model),
+]);
+
+export type ModelPricing = typeof modelPricing.$inferSelect;
+export type NewModelPricing = typeof modelPricing.$inferInsert;
