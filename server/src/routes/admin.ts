@@ -23,6 +23,7 @@ import {
   budgetPolicies,
   modelPricing,
   attendanceLogs,
+  instructorSkills,
   eq,
   and,
   isNull,
@@ -32,6 +33,7 @@ import {
   lte,
   lt,
 } from '@educlip/db';
+import { invalidateSkillCache, importSkillFromGitHub } from '../services/skill-injector.js';
 import { ConnectorRegistry } from '../mcp/registry.js';
 import { withAuditLog } from '../mcp/audit.js';
 import { invalidatePricingCache } from '../services/budget-guard.js';
@@ -295,9 +297,204 @@ router.put('/agents/:id', (_req, res) => {
   res.status(501).json({ message: 'Phase 3에서 구현 예정' });
 });
 
-// PUT /admin/skills — 스킬 파일 관리 (Phase 3)
-router.put('/skills', (_req, res) => {
-  res.status(501).json({ message: 'Phase 3에서 구현 예정' });
+// ── 스킬 파일 CRUD (Phase 3-1) ───────────────────────────────────────────────
+
+const createSkillSchema = z.object({
+  title: z.string().min(1),
+  markdown: z.string().min(1),
+  courseId: z.string().uuid().optional(),
+  agentId: z.string().uuid().optional(),
+  isActive: z.boolean().default(true),
+});
+
+const updateSkillSchema = z.object({
+  title: z.string().min(1).optional(),
+  markdown: z.string().min(1).optional(),
+  courseId: z.string().uuid().nullable().optional(),
+  agentId: z.string().uuid().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const importGitHubSkillSchema = z.object({
+  rawUrl: z.string().url(),
+  title: z.string().min(1),
+  courseId: z.string().uuid().optional(),
+  agentId: z.string().uuid().optional(),
+});
+
+/**
+ * GET /admin/skills
+ * 기관 내 활성 스킬 목록을 조회합니다.
+ * 쿼리: ?agentId=<uuid>&courseId=<uuid>
+ */
+router.get('/skills', async (req, res) => {
+  const { institutionId } = req.user!;
+  const agentId = req.query['agentId'] as string | undefined;
+  const courseId = req.query['courseId'] as string | undefined;
+
+  const conditions = [
+    eq(instructorSkills.institutionId, institutionId),
+    isNull(instructorSkills.deletedAt),
+  ];
+  if (agentId) conditions.push(eq(instructorSkills.agentId, agentId));
+  if (courseId) conditions.push(eq(instructorSkills.courseId, courseId));
+
+  const rows = await db
+    .select()
+    .from(instructorSkills)
+    .where(and(...conditions))
+    .orderBy(desc(instructorSkills.createdAt));
+
+  res.json({ skills: rows });
+});
+
+/**
+ * POST /admin/skills
+ * 새 스킬 파일을 등록합니다.
+ */
+router.post('/skills', async (req, res) => {
+  const parsed = createSkillSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  const { institutionId } = req.user!;
+  const { title, markdown, courseId, agentId, isActive } = parsed.data;
+
+  const [skill] = await db
+    .insert(instructorSkills)
+    .values({ institutionId, title, markdown, courseId, agentId, isActive })
+    .returning();
+
+  if (agentId) invalidateSkillCache(agentId);
+
+  res.status(201).json({ skill });
+});
+
+/**
+ * PUT /admin/skills/:id
+ * 스킬 파일을 수정하고 캐시를 무효화합니다 (핫 리로드).
+ */
+router.put('/skills/:id', async (req, res) => {
+  const { id } = req.params;
+  const parsed = updateSkillSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  const { institutionId } = req.user!;
+
+  const [existing] = await db
+    .select({ id: instructorSkills.id, agentId: instructorSkills.agentId })
+    .from(instructorSkills)
+    .where(
+      and(
+        eq(instructorSkills.id, id),
+        eq(instructorSkills.institutionId, institutionId),
+        isNull(instructorSkills.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!existing) {
+    res.status(404).json({ error: '스킬을 찾을 수 없습니다.' });
+    return;
+  }
+
+  const patch = { ...parsed.data, updatedAt: new Date() };
+
+  const [updated] = await db
+    .update(instructorSkills)
+    .set(patch)
+    .where(eq(instructorSkills.id, id))
+    .returning();
+
+  // 기존 agentId와 새 agentId 모두 캐시 무효화
+  if (existing.agentId) invalidateSkillCache(existing.agentId);
+  if (parsed.data.agentId && parsed.data.agentId !== existing.agentId) {
+    invalidateSkillCache(parsed.data.agentId);
+  }
+
+  res.json({ skill: updated });
+});
+
+/**
+ * DELETE /admin/skills/:id
+ * 스킬 파일을 소프트 딜리트합니다 (sourceRef 이력 보존).
+ */
+router.delete('/skills/:id', async (req, res) => {
+  const { id } = req.params;
+  const { institutionId } = req.user!;
+
+  const [existing] = await db
+    .select({ id: instructorSkills.id, agentId: instructorSkills.agentId })
+    .from(instructorSkills)
+    .where(
+      and(
+        eq(instructorSkills.id, id),
+        eq(instructorSkills.institutionId, institutionId),
+        isNull(instructorSkills.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!existing) {
+    res.status(404).json({ error: '스킬을 찾을 수 없습니다.' });
+    return;
+  }
+
+  await db
+    .update(instructorSkills)
+    .set({ deletedAt: new Date(), isActive: false })
+    .where(eq(instructorSkills.id, id));
+
+  if (existing.agentId) invalidateSkillCache(existing.agentId);
+
+  res.json({ message: '스킬이 삭제되었습니다.', id });
+});
+
+/**
+ * POST /admin/skills/import-github
+ * GitHub Raw URL에서 마크다운을 가져와 스킬로 등록합니다.
+ * sourceRef에 Git ref(커밋 해시 또는 브랜치명)를 기록합니다.
+ */
+router.post('/skills/import-github', async (req, res) => {
+  const parsed = importGitHubSkillSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  const { institutionId } = req.user!;
+  const { rawUrl, title, courseId, agentId } = parsed.data;
+
+  let imported: { markdown: string; sourceRef: string; sourceUrl: string };
+  try {
+    imported = await importSkillFromGitHub(rawUrl);
+  } catch (err) {
+    res.status(422).json({ error: (err as Error).message });
+    return;
+  }
+
+  const [skill] = await db
+    .insert(instructorSkills)
+    .values({
+      institutionId,
+      title,
+      markdown: imported.markdown,
+      sourceRef: imported.sourceRef,
+      sourceUrl: imported.sourceUrl,
+      courseId,
+      agentId,
+      isActive: true,
+    })
+    .returning();
+
+  if (agentId) invalidateSkillCache(agentId);
+
+  res.status(201).json({ skill });
 });
 
 // ── MCP 외부 시스템 연동 API (Phase 1-3) ────────────────────────────────

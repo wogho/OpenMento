@@ -14,6 +14,7 @@
 import { eq, asc, desc, and, isNull, db, conversationMessages, agents } from '@educlip/db';
 import { searchSimilarChunks } from '@educlip/rag';
 import { buildSystemPrompt } from './prompts.js';
+import { getSkillMarkdown } from './skill-injector.js';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';
 import { recordCostEvent } from './budget-guard.js';
@@ -82,7 +83,8 @@ export async function tutorChat(options: TutorChatOptions): Promise<TutorChatRes
   });
 
   // ── 3. System Prompt 조합 ────────────────────────────────────────────
-  const systemPrompt = buildSystemPrompt(ragResults);
+  const skillMd = await getSkillMarkdown(agentId, institutionId);
+  const systemPrompt = buildSystemPrompt(ragResults, skillMd ?? undefined);
 
   // ── 4. 대화 이력 로드 ────────────────────────────────────────────────
   // [보안 Fix #1] sessionId + studentId 복합 조건으로 본인 세션만 조회
