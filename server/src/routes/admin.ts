@@ -24,6 +24,7 @@ import {
   modelPricing,
   attendanceLogs,
   instructorSkills,
+  agents,
   eq,
   and,
   isNull,
@@ -287,14 +288,181 @@ router.put('/budget', (_req, res) => {
   res.status(501).json({ message: 'Phase 2에서 구현 예정' });
 });
 
-// POST /admin/agents — 에이전트 등록 (Phase 3)
-router.post('/agents', (_req, res) => {
-  res.status(501).json({ message: 'Phase 3에서 구현 예정' });
+// ── 에이전트 CRUD (Phase 3-2) ─────────────────────────────────────────────────
+
+const adapterConfigSchema = z.object({
+  provider: z.enum(['openai', 'anthropic', 'google']),
+  model: z.string().min(1),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().positive().optional(),
+  timeoutMs: z.number().int().positive().optional(),
 });
 
-// PUT /admin/agents/:id — 에이전트 설정 변경 (Phase 3)
-router.put('/agents/:id', (_req, res) => {
-  res.status(501).json({ message: 'Phase 3에서 구현 예정' });
+const createAgentSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/),
+  role: z.enum(['orchestrator', 'ews_monitor', 'ai_instructor', 'ai_tutor', 'mental_care', 'portfolio_reviewer']),
+  reportsTo: z.string().uuid().optional().nullable(),
+  adapterConfig: adapterConfigSchema,
+  fallbackAdapterConfig: adapterConfigSchema.optional().nullable(),
+  systemPrompt: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+const updateAgentSchema = createAgentSchema.partial();
+
+/**
+ * GET /admin/agents
+ * 기관 소속 전체 에이전트 목록 조회 (소프트 딜리트 제외)
+ */
+router.get('/agents', async (req, res) => {
+  const institutionId = (req as any).user?.institutionId as string | undefined;
+  if (!institutionId) {
+    res.status(400).json({ error: 'institutionId가 없습니다.' });
+    return;
+  }
+
+  const rows = await db
+    .select()
+    .from(agents)
+    .where(
+      and(
+        eq(agents.institutionId, institutionId),
+        isNull(agents.deletedAt),
+      ),
+    )
+    .orderBy(agents.createdAt);
+
+  res.json({ agents: rows });
+});
+
+/**
+ * GET /admin/agents/:id
+ * 특정 에이전트 조회
+ */
+router.get('/agents/:id', async (req, res) => {
+  const institutionId = (req as any).user?.institutionId as string | undefined;
+  const { id } = req.params;
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(
+      and(
+        eq(agents.id, id),
+        eq(agents.institutionId, institutionId!),
+        isNull(agents.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!agent) {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+
+  res.json({ agent });
+});
+
+/**
+ * POST /admin/agents — 에이전트 등록 (Phase 3-2)
+ */
+router.post('/agents', async (req, res) => {
+  const institutionId = (req as any).user?.institutionId as string | undefined;
+  if (!institutionId) {
+    res.status(400).json({ error: 'institutionId가 없습니다.' });
+    return;
+  }
+
+  const parsed = createAgentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const { reportsTo, fallbackAdapterConfig, ...rest } = parsed.data;
+
+  const [agent] = await db
+    .insert(agents)
+    .values({
+      institutionId,
+      ...rest,
+      reportsTo: reportsTo ?? undefined,
+      fallbackAdapterConfig: fallbackAdapterConfig ?? undefined,
+    })
+    .returning();
+
+  res.status(201).json({ agent });
+});
+
+/**
+ * PUT /admin/agents/:id — 에이전트 설정 변경 (Phase 3-2)
+ * adapterConfig, fallbackAdapterConfig, systemPrompt, isActive 등 부분 업데이트 지원
+ */
+router.put('/agents/:id', async (req, res) => {
+  const institutionId = (req as any).user?.institutionId as string | undefined;
+  const { id } = req.params;
+
+  const parsed = updateAgentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const { reportsTo, fallbackAdapterConfig, ...rest } = parsed.data;
+
+  const updateValues: Record<string, unknown> = {
+    ...rest,
+    updatedAt: new Date(),
+  };
+  if (reportsTo !== undefined) updateValues.reportsTo = reportsTo;
+  if (fallbackAdapterConfig !== undefined) updateValues.fallbackAdapterConfig = fallbackAdapterConfig;
+
+  const [updated] = await db
+    .update(agents)
+    .set(updateValues)
+    .where(
+      and(
+        eq(agents.id, id),
+        eq(agents.institutionId, institutionId!),
+        isNull(agents.deletedAt),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+
+  res.json({ agent: updated });
+});
+
+/**
+ * DELETE /admin/agents/:id — 에이전트 소프트 딜리트
+ */
+router.delete('/agents/:id', async (req, res) => {
+  const institutionId = (req as any).user?.institutionId as string | undefined;
+  const { id } = req.params;
+
+  const [deleted] = await db
+    .update(agents)
+    .set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(agents.id, id),
+        eq(agents.institutionId, institutionId!),
+        isNull(agents.deletedAt),
+      ),
+    )
+    .returning({ id: agents.id });
+
+  if (!deleted) {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+
+  res.json({ deleted: true, id: deleted.id });
 });
 
 // ── 스킬 파일 CRUD (Phase 3-1) ───────────────────────────────────────────────

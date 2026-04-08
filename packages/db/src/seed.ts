@@ -13,6 +13,7 @@
 
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { eq } from 'drizzle-orm';
 import * as schema from './schema/index.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -142,7 +143,9 @@ async function seed() {
         name: 'AI 튜터',
         slug: 'ai-tutor',
         role: 'ai_tutor',
-        reportsTo: orchestrator.id,
+        // plan.md 3-2: AI 튜터 → AI 강사(Java반) 하위 에이전트
+        // subAgents[0] = AI 강사 (Java반)
+        reportsTo: undefined, // placeholder — 아래에서 별도 upsert
         adapterConfig: { provider: 'anthropic', model: 'claude-haiku-3-5' },
         fallbackAdapterConfig: { provider: 'openai', model: 'gpt-4o-mini' },
         isActive: true,
@@ -169,6 +172,15 @@ async function seed() {
       },
     ])
     .returning();
+
+  // AI 튜터의 reportsTo를 AI 강사(Java반)로 업데이트
+  // subAgents[0] = AI 강사 (Java반), subAgents[2] = AI 튜터
+  const javaInstructor = subAgents[0]!;
+  const aiTutor = subAgents[2]!;
+  await db
+    .update(schema.agents)
+    .set({ reportsTo: javaInstructor.id })
+    .where(eq(schema.agents.id, aiTutor.id));
 
   console.log(`  ✓ 에이전트 ${2 + subAgents.length}개 생성 (오케스트레이터 계층 포함)`);
 

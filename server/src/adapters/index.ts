@@ -8,6 +8,7 @@
 import type { AdapterConfig, ILlmAdapter } from './llm.interface.js';
 import { OpenAiAdapter } from './openai.adapter.js';
 import { AnthropicAdapter } from './anthropic.adapter.js';
+import { GoogleAdapter } from './google.adapter.js';
 
 export function createAdapter(config: AdapterConfig): ILlmAdapter {
   switch (config.provider) {
@@ -15,6 +16,8 @@ export function createAdapter(config: AdapterConfig): ILlmAdapter {
       return new OpenAiAdapter(config);
     case 'anthropic':
       return new AnthropicAdapter(config);
+    case 'google':
+      return new GoogleAdapter(config);
     default: {
       const _exhaustive: never = config.provider;
       throw new Error(`지원하지 않는 LLM 프로바이더: ${_exhaustive}`);

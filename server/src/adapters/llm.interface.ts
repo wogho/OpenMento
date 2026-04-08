@@ -16,7 +16,7 @@ export interface LlmMessage {
 
 // ── 어댑터 설정 ───────────────────────────────────────────────────────────
 export interface AdapterConfig {
-  provider: 'openai' | 'anthropic';
+  provider: 'openai' | 'anthropic' | 'google';
   model: string;
   temperature?: number;        // 기본값: 0.7
   maxTokens?: number;          // 기본값: 2048
