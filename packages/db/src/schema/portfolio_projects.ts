@@ -30,9 +30,11 @@ export const portfolioStatusEnum = pgEnum('portfolio_status', [
   'draft',
   'interview',
   'planning',
+  'hitl_review',        // 개선③: 강사 HITL 승인 대기 (planning → security_review 사이)
   'security_review',
   'similarity_check',
   'approved',
+  'abandoned',          // 개선②: 24시간 무응답으로 자동 정리된 세션
 ]);
 
 export const portfolioProjects = pgTable('portfolio_projects', {

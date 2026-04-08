@@ -811,3 +811,49 @@ github api
 ### G-3. 에이전트 변경 감사 로그(Audit) 연동 ✅
 - **문제**: 에이전트 시스템 프롬프트 및 예산이 강사/관리자에 의해 임의 수정 시 추적 불가
 - **해결**: 에이전트 생성/수정/삭제 시 `audit_logs` 테이블에 변경 전/후의 JSON 상태(`oldValue`, `newValue`)를 영속 기록
+
+---
+
+## 부록 H. Phase 4-1 완료 후 개선 반영 이력 (2026-04-08)
+
+> Phase 4-1 다중 에이전트 오케스트레이션 구현 완료 후 운영 안정성·확장성을 위해 개선 3가지를 반영하였습니다.
+
+### H-1. 페르소나 템플릿 DB 영속화 (Dynamic Persona Management) ✅
+- **문제**: `persona-prompts.ts`에 산업군 페르소나가 하드코딩되어 있어 플랫폼 확장 시 코드 수정 필요
+- **해결**:
+  - `packages/db/src/schema/persona_templates.ts` 신규 추가 — `institutionId: null` 전역 기본, `institutionId: UUID` 기관 커스텀 이중 구조
+  - `server/src/services/persona-service.ts` — `listPersonas()`, `getPersonaById()`, `createPersona()`, `deletePersona()`, `seedPersonaTemplates()` 구현
+  - `legacyKey` 필드로 기존 `persona-prompts.ts` ID 하위 호환 보장
+  - REST API: `GET/POST/DELETE /portfolio/personas` (관리자·강사 GUI 연동 준비)
+
+**신규 파일**: `packages/db/src/schema/persona_templates.ts`, `server/src/services/persona-service.ts`
+
+---
+
+### H-2. Stale Session 자동 정리 스케줄러 ✅
+- **문제**: 수강생이 인터뷰 중 이탈하면 `goals` 상태가 영구적으로 `in-progress`로 남아 데이터 오염
+- **해결**:
+  - `server/src/services/portfolio-stale-cleaner.ts` — `cleanStalePortfolioSessions()` 구현
+  - 24시간 미갱신 Goals(상태 `active`, `awaitingUserInput=true`)를 `abandoned`로 전환
+  - Phase 2 Heartbeat 스케줄러 `routines` 테이블에 `0 3 * * *` (매일 새벽 3시) 시드 등록
+  - Slack 알림: 수강생에게 "미완료 포트폴리오 세션" 리마인드 메시지 발송 (`sendSystemAlert` 연동)
+  - 처리 결과: `{ scanned, abandoned, notified, errors[] }` 반환 — 전체 항목 실패 시에도 다음 항목 계속 처리
+
+**신규 파일**: `server/src/services/portfolio-stale-cleaner.ts`
+
+---
+
+### H-3. Human-in-the-Loop (HITL) 강사 개입 지점 추가 ✅
+- **문제**: 기획서 완성 후 보안 검토·유사도 판별이 완전 자동 진행되어 강사 개입 불가
+- **해결**:
+  - `PortfolioStage`에 `hitl_review` 상태 추가 (FSM: `planning → hitl_review → security_review`)
+  - `startPortfolioWorkflow({ hitlEnabled: true })` 옵션으로 기관별 HITL 활성화 선택
+  - `processHitlReview({ approved, feedback })` — 승인 시 `security_review`로 전환, 거부 시 `planning`으로 복귀 + 피드백 기록
+  - REST API: `POST /portfolio/:goalId/hitl-review` (강사 전용, RBAC `instructor` 역할 제한)
+  - `WorkflowState.awaitingInstructorReview` 필드 추가 — 프론트엔드 UI 분기용
+
+**수정 파일**: `server/src/services/portfolio-orchestrator.ts`, `server/src/routes/portfolio.ts`
+
+---
+
+**테스트 현황**: 145개 전체 통과 (Phase 4-1 개선 신규 18개 포함)

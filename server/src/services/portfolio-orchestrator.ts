@@ -38,6 +38,7 @@ import { getPersonaById, PERSONA_TEMPLATES } from './persona-prompts.js';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';
 import { recordCostEvent } from './budget-guard.js';
+import { sendSystemAlert } from './slack-notifier.js';
 
 // ── 상수 ───────────────────────────────────────────────────────────────────
 const LLM_TIMEOUT_MS = 30_000; // 30초 per LLM call
@@ -45,7 +46,7 @@ const DEFAULT_MAX_ITERATIONS = 10;
 
 /** 에이전트 간 메시지 전달 프로토콜 */
 export interface AgentMessage {
-  role: 'persona' | 'planner' | 'security' | 'similarity' | 'user';
+  role: 'persona' | 'planner' | 'security' | 'similarity' | 'user' | 'system';
   content: string;
   stage: PortfolioStage;
   timestamp: string; // ISO-8601
@@ -55,18 +56,24 @@ export type PortfolioStage =
   | 'draft'
   | 'interview'
   | 'planning'
+  | 'hitl_review'       // 개선③: 강사 HITL 승인 대기
   | 'security_review'
   | 'similarity_check'
-  | 'approved';
+  | 'approved'
+  | 'abandoned';        // 개선②: 24시간 무응답 자동 정리
 
 /** sharedContext JSONB 구조 */
 interface SharedContext {
   personaId: string;
   messages: AgentMessage[];
-  proposalDraft: string;  // 인터뷰를 거쳐 수집된 기획 내용
-  techStackDraft: string; // planning 단계에서 수집된 기술 스택
+  proposalDraft: string;    // 인터뷰를 거쳐 수집된 기획 내용
+  techStackDraft: string;   // planning 단계에서 수집된 기술 스택
   securityFindings: string; // security_review 결과
   similarityScore?: number;
+  /** HITL 관련 */
+  hitlEnabled?: boolean;    // 기관/강사 설정으로 HITL 활성화 여부
+  hitlApprovedAt?: string;  // 강사가 승인한 시각
+  hitlRejectedReason?: string; // 거부 시 피드백
 }
 
 export interface StartWorkflowOptions {
@@ -77,6 +84,8 @@ export interface StartWorkflowOptions {
   personaId?: string;
   /** 오케스트레이터 역할의 에이전트 DB ID (없으면 기본 설정 사용) */
   agentId?: string;
+  /** 강사 HITL 활성화 여부 (기획서 완성 후 강사 검토 필수). 기본값: false */
+  hitlEnabled?: boolean;
 }
 
 export interface WorkflowState {
@@ -89,6 +98,17 @@ export interface WorkflowState {
   /** 워크플로우 완료 여부 */
   completed: boolean;
   similarityScore?: number;
+  /** HITL 강사 검토 대기 중 여부 */
+  awaitingInstructorReview?: boolean;
+}
+
+/** HITL 강사 승인/거부 옵션 */
+export interface HitlReviewOptions {
+  goalId: string;
+  instructorId: string;
+  approved: boolean;
+  /** 거부 시 수강생에게 전달할 피드백 */
+  feedback?: string;
 }
 
 export interface AdvanceWorkflowOptions {
@@ -298,6 +318,7 @@ export async function startPortfolioWorkflow(
     proposalDraft: '',
     techStackDraft: '',
     securityFindings: '',
+    hitlEnabled: options.hitlEnabled ?? false,
   };
 
   const [goal] = await db
@@ -469,21 +490,53 @@ export async function advanceWorkflow(
         userMessage.trim() === '완료';
       if (planningDone) {
         ctx.techStackDraft = agentResponse.content;
-        nextStage = 'security_review';
-        const securityOpening = await callLlm(
-          adapter,
-          buildSecurityMessages(ctx, ''),
-          goalRow.initiatorAgentId ?? 'system',
-          goalRow.institutionId ?? '',
-        );
-        const secMsg: AgentMessage = {
-          role: 'security',
-          content: securityOpening.content,
-          stage: 'security_review',
-          timestamp: new Date().toISOString(),
-        };
-        ctx.messages.push(secMsg);
+
+        // ── HITL 분기: hitlEnabled=true이면 강사 검토 대기 단계로 전환 ────────────
+        if (ctx.hitlEnabled) {
+          nextStage = 'hitl_review';
+          const hitlNotice: AgentMessage = {
+            role: 'system',
+            content:
+              '기획서 초안이 완성되었습니다. 담당 강사의 검토 후 보안 분석 단계로 진행됩니다. ' +
+              '강사가 승인할 때까지 잠시 기다려 주세요.',
+            stage: 'hitl_review',
+            timestamp: new Date().toISOString(),
+          };
+          ctx.messages.push(hitlNotice);
+          // Slack으로 강사에게 검토 요청 알림
+          await sendSystemAlert(
+            `[HITL 강사 검토 요청] Goal ID: ${goalId}\n` +
+              `기획서 초안이 완성되었습니다. 포털에서 검토 후 승인/거부해 주세요.`,
+          );
+        } else {
+          nextStage = 'security_review';
+          const securityOpening = await callLlm(
+            adapter,
+            buildSecurityMessages(ctx, ''),
+            goalRow.initiatorAgentId ?? 'system',
+            goalRow.institutionId ?? '',
+          );
+          const secMsg: AgentMessage = {
+            role: 'security',
+            content: securityOpening.content,
+            stage: 'security_review',
+            timestamp: new Date().toISOString(),
+          };
+          ctx.messages.push(secMsg);
+        }
       }
+      break;
+    }
+
+    case 'hitl_review': {
+      // 수강생 메시지는 무시 — 강사 승인/거부 API(processHitlReview)를 통해서만 진행
+      agentResponse = {
+        role: 'system',
+        content: '담당 강사의 검토가 진행 중입니다. 잠시 기다려 주세요.',
+        stage: 'hitl_review',
+        timestamp: new Date().toISOString(),
+      };
+      nextStage = 'hitl_review'; // 강사 승인 전까지 유지
       break;
     }
 
@@ -575,7 +628,8 @@ export async function advanceWorkflow(
     projectId,
     stage: nextStage,
     messages: ctx.messages.slice(-5), // 최근 5개 메시지만 반환 (페이로드 절감)
-    awaitingUserInput: nextStage !== 'approved',
+    awaitingUserInput: nextStage !== 'approved' && nextStage !== 'hitl_review',
+    awaitingInstructorReview: nextStage === 'hitl_review',
     completed: false,
     similarityScore: ctx.similarityScore,
   };
@@ -611,10 +665,114 @@ export async function getWorkflowState(goalId: string): Promise<WorkflowState> {
     projectId,
     stage,
     messages: ctx?.messages ?? [],
-    awaitingUserInput: goalRow.status === 'active' && stage !== 'approved',
+    awaitingUserInput: goalRow.status === 'active' && stage !== 'approved' && stage !== 'hitl_review',
+    awaitingInstructorReview: stage === 'hitl_review',
     completed: goalRow.status === 'completed' || goalRow.status === 'failed',
     similarityScore: ctx?.similarityScore,
   };
+}
+
+/**
+ * HITL 강사 승인/거부 처리 (개선③)
+ *
+ * - 승인: hitl_review → security_review 전환, 보안 에이전트 첫 메시지 발행
+ * - 거부: 피드백 메시지 추가 후 planning 단계로 되돌림 (수강생이 기획서 수정 가능)
+ */
+export async function processHitlReview(
+  options: HitlReviewOptions,
+): Promise<WorkflowState> {
+  const { goalId, instructorId, approved, feedback } = options;
+
+  const [goalRow] = await db
+    .select()
+    .from(goals)
+    .where(and(eq(goals.id, goalId), eq(goals.status, 'active')))
+    .limit(1);
+
+  if (!goalRow) {
+    throw Object.assign(new Error('활성 Goal을 찾을 수 없습니다.'), { statusCode: 404 });
+  }
+
+  const ctx = goalRow.sharedContext as SharedContext & { projectId: string };
+  const projectId = ctx.projectId;
+
+  // 현재 단계가 hitl_review인지 검증
+  const [projectRow] = await db
+    .select({ status: portfolioProjects.status })
+    .from(portfolioProjects)
+    .where(eq(portfolioProjects.id, projectId))
+    .limit(1);
+
+  if (!projectRow || projectRow.status !== 'hitl_review') {
+    throw Object.assign(
+      new Error('현재 HITL 검토 대기 상태가 아닙니다.'),
+      { statusCode: 409 },
+    );
+  }
+
+  if (approved) {
+    // ── 승인: security_review로 이동 ──────────────────────────────────────
+    ctx.hitlApprovedAt = new Date().toISOString();
+    const approvalMsg: AgentMessage = {
+      role: 'system',
+      content: `강사 검토가 완료되었습니다. (검토자: ${instructorId}) 이제 보안 전문가 에이전트가 기획서를 분석합니다.`,
+      stage: 'security_review',
+      timestamp: new Date().toISOString(),
+    };
+    ctx.messages.push(approvalMsg);
+
+    const adapter = await resolveAdapter(goalRow.initiatorAgentId ?? undefined);
+    const securityOpening = await callLlm(
+      adapter,
+      buildSecurityMessages(ctx, ''),
+      goalRow.initiatorAgentId ?? 'system',
+      goalRow.institutionId ?? '',
+    );
+    const secMsg: AgentMessage = {
+      role: 'security',
+      content: securityOpening.content,
+      stage: 'security_review',
+      timestamp: new Date().toISOString(),
+    };
+    ctx.messages.push(secMsg);
+
+    await saveContext(goalId, projectId, ctx, 'security_review');
+
+    return {
+      goalId,
+      projectId,
+      stage: 'security_review',
+      messages: ctx.messages.slice(-5),
+      awaitingUserInput: true,
+      awaitingInstructorReview: false,
+      completed: false,
+    };
+  } else {
+    // ── 거부: planning으로 되돌림 ────────────────────────────────────────
+    ctx.hitlRejectedReason = feedback ?? '강사 검토 결과 수정이 필요합니다.';
+    const rejectMsg: AgentMessage = {
+      role: 'system',
+      content:
+        `강사 검토 결과 수정이 필요합니다.\n\n` +
+        `피드백: ${ctx.hitlRejectedReason}\n\n` +
+        `기획서를 수정한 후 다시 제출해 주세요.`,
+      stage: 'planning',
+      timestamp: new Date().toISOString(),
+    };
+    ctx.messages.push(rejectMsg);
+
+    await saveContext(goalId, projectId, ctx, 'planning');
+
+    return {
+      goalId,
+      projectId,
+      stage: 'planning',
+      messages: ctx.messages.slice(-5),
+      awaitingUserInput: true,
+      awaitingInstructorReview: false,
+      completed: false,
+    };
+  }
 }
 
 // ── 단계별 핸들러 ──────────────────────────────────────────────────────────
