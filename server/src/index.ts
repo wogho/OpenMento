@@ -7,6 +7,7 @@ import studentRouter from './routes/student.js';
 import instructorRouter from './routes/instructor.js';
 import adminRouter from './routes/admin.js';
 import webhookRouter from './routes/webhook.js';
+import portfolioRouter from './routes/portfolio.js';
 import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
 import { startWebhookWorker, closeWebhookWorker } from './queues/webhook.worker.js';
@@ -47,6 +48,7 @@ app.use('/auth', authLimiter, authRouter);
 app.use('/student', chatLimiter, studentRouter);
 app.use('/instructor', adminLimiter, instructorRouter);
 app.use('/admin', adminLimiter, adminRouter);
+app.use('/portfolio', chatLimiter, portfolioRouter);
 
 // ── 미등록 라우트 처리 ────────────────────────────────────
 app.use((_req, res) => {

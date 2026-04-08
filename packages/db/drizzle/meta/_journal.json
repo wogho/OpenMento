@@ -50,6 +50,13 @@
       "when": 1775572512205,
       "tag": "0008_oval_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775678748368,
+      "tag": "0007_deep_thunderbolts",
+      "breakpoints": true
     }
   ]
 }
