@@ -47,6 +47,44 @@ export async function logMcpAccess(payload: McpAuditPayload): Promise<void> {
 }
 
 /**
+ * 에이전트 CUD(Create·Update·Delete) 작업을 audit_logs 에 기록합니다.
+ *
+ * plan.md Phase 3 개선③: 에이전트 변경 감사 로그(Audit Trail) 연동
+ * - resourceType = 'agent'
+ * - metadata.operation: 'create' | 'update' | 'delete'
+ * - metadata.before / metadata.after: 변경 전·후 스냅샷 (민감 키 제외)
+ * - 로그 저장 실패는 메인 흐름에 영향 없이 무시합니다.
+ */
+export async function logAgentChange(
+  payload: {
+    institutionId: string;
+    actorId: string;
+    operation: 'create' | 'update' | 'delete';
+    agentId: string;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
+    ipAddress?: string;
+  },
+  /** 테스트 주입용 — 생략 시 실제 logMcpAccess 사용 */
+  _logFn: typeof logMcpAccess = logMcpAccess,
+): Promise<void> {
+  await _logFn({
+    institutionId: payload.institutionId,
+    actorId: payload.actorId,
+    actorType: 'admin',
+    action: payload.operation === 'delete' ? 'delete' : 'write',
+    resourceType: 'agent',
+    resourceId: payload.agentId,
+    metadata: {
+      operation: payload.operation,
+      ...(payload.before !== undefined && { before: payload.before }),
+      ...(payload.after !== undefined && { after: payload.after }),
+    },
+    ipAddress: payload.ipAddress,
+  });
+}
+
+/**
  * 커넥터 호출을 감사 로그와 함께 실행하는 래퍼
  *
  * @example

@@ -35,8 +35,9 @@ import {
 
 } from '@educlip/db';
 import { invalidateSkillCache, importSkillFromGitHub } from '../services/skill-injector.js';
+import { hasCyclicParent } from '../services/agent-hierarchy.js';
 import { ConnectorRegistry } from '../mcp/registry.js';
-import { withAuditLog } from '../mcp/audit.js';
+import { withAuditLog, logAgentChange } from '../mcp/audit.js';
 import { invalidatePricingCache } from '../services/budget-guard.js';
 import { getEwsThresholds, setEwsThresholds } from '../services/ews-thresholds.js';
 import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
@@ -369,6 +370,7 @@ router.get('/agents/:id', async (req, res) => {
  */
 router.post('/agents', async (req, res) => {
   const institutionId = (req as any).user?.institutionId as string | undefined;
+  const actorId = (req as any).user?.userId as string | undefined;
   if (!institutionId) {
     res.status(400).json({ error: 'institutionId가 없습니다.' });
     return;
@@ -382,6 +384,16 @@ router.post('/agents', async (req, res) => {
 
   const { reportsTo, fallbackAdapterConfig, ...rest } = parsed.data;
 
+  // ── [개선①] 순환 참조 사전 차단 ─────────────────────────────────────────
+  if (reportsTo) {
+    // 신규 에이전트는 아직 ID가 없으므로 agentId=null (자기-참조 불가, DB 레벨에서도 차단)
+    const hasCycle = await hasCyclicParent(null, reportsTo, institutionId);
+    if (hasCycle) {
+      res.status(409).json({ error: '에이전트 계층에 순환 참조가 발생합니다. reportsTo 설정을 확인하세요.' });
+      return;
+    }
+  }
+
   const [agent] = await db
     .insert(agents)
     .values({
@@ -392,6 +404,16 @@ router.post('/agents', async (req, res) => {
     })
     .returning();
 
+  // ── [개선③] 에이전트 생성 감사 로그 ──────────────────────────────────────
+  void logAgentChange({
+    institutionId,
+    actorId: actorId ?? 'unknown',
+    operation: 'create',
+    agentId: agent.id,
+    after: { name: agent.name, role: agent.role, reportsTo: agent.reportsTo },
+    ipAddress: req.ip,
+  });
+
   res.status(201).json({ agent });
 });
 
@@ -401,6 +423,7 @@ router.post('/agents', async (req, res) => {
  */
 router.put('/agents/:id', async (req, res) => {
   const institutionId = (req as any).user?.institutionId as string | undefined;
+  const actorId = (req as any).user?.userId as string | undefined;
   const { id } = req.params;
 
   const parsed = updateAgentSchema.safeParse(req.body);
@@ -410,6 +433,22 @@ router.put('/agents/:id', async (req, res) => {
   }
 
   const { reportsTo, fallbackAdapterConfig, ...rest } = parsed.data;
+
+  // ── [개선①] 순환 참조 사전 차단 ─────────────────────────────────────────
+  if (reportsTo) {
+    const hasCycle = await hasCyclicParent(id, reportsTo, institutionId!);
+    if (hasCycle) {
+      res.status(409).json({ error: '에이전트 계층에 순환 참조가 발생합니다. reportsTo 설정을 확인하세요.' });
+      return;
+    }
+  }
+
+  // ── [개선③] 변경 전 스냅샷 조회 ─────────────────────────────────────────
+  const [before] = await db
+    .select({ name: agents.name, role: agents.role, reportsTo: agents.reportsTo, isActive: agents.isActive })
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!), isNull(agents.deletedAt)))
+    .limit(1);
 
   const updateValues: Record<string, unknown> = {
     ...rest,
@@ -435,6 +474,19 @@ router.put('/agents/:id', async (req, res) => {
     return;
   }
 
+  // ── [개선③] 에이전트 변경 감사 로그 ──────────────────────────────────────
+  void logAgentChange({
+    institutionId: institutionId!,
+    actorId: actorId ?? 'unknown',
+    operation: 'update',
+    agentId: id,
+    before: before
+      ? { name: before.name, role: before.role, reportsTo: before.reportsTo, isActive: before.isActive }
+      : null,
+    after: { name: updated.name, role: updated.role, reportsTo: updated.reportsTo, isActive: updated.isActive },
+    ipAddress: req.ip,
+  });
+
   res.json({ agent: updated });
 });
 
@@ -443,6 +495,7 @@ router.put('/agents/:id', async (req, res) => {
  */
 router.delete('/agents/:id', async (req, res) => {
   const institutionId = (req as any).user?.institutionId as string | undefined;
+  const actorId = (req as any).user?.userId as string | undefined;
   const { id } = req.params;
 
   const [deleted] = await db
@@ -455,12 +508,22 @@ router.delete('/agents/:id', async (req, res) => {
         isNull(agents.deletedAt),
       ),
     )
-    .returning({ id: agents.id });
+    .returning({ id: agents.id, name: agents.name, role: agents.role });
 
   if (!deleted) {
     res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
     return;
   }
+
+  // ── [개선③] 에이전트 삭제 감사 로그 ──────────────────────────────────────
+  void logAgentChange({
+    institutionId: institutionId!,
+    actorId: actorId ?? 'unknown',
+    operation: 'delete',
+    agentId: deleted.id,
+    before: { name: deleted.name, role: deleted.role },
+    ipAddress: req.ip,
+  });
 
   res.json({ deleted: true, id: deleted.id });
 });

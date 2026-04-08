@@ -251,6 +251,45 @@ export async function sendEwsEscalations(
  * @param webhookUrl  테스트할 Slack Webhook URL
  * @throws 발송 실패 시 Error를 throw (caller가 에러 처리)
  */
+/**
+ * 시스템 레벨 알림을 Slack에 발송합니다 (서킷 브레이커 작동 등).
+ *
+ * - SLACK_WEBHOOK_URL 미설정 시 조용히 무시합니다.
+ * - 발송 실패해도 throw 하지 않습니다.
+ */
+export async function sendSystemAlert(message: string): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  try {
+    await postToSlack(webhookUrl, {
+      text: message,
+      attachments: [
+        {
+          color: '#ff6600',
+          blocks: [
+            {
+              type: 'section',
+              text: { type: 'mrkdwn', text: message },
+            },
+            {
+              type: 'context',
+              elements: [
+                {
+                  type: 'mrkdwn',
+                  text: `*EduClip 시스템* | ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST`,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  } catch (err) {
+    console.error('[slack-notifier] 시스템 알림 발송 실패:', err);
+  }
+}
+
 export async function sendSlackTestMessage(webhookUrl: string): Promise<void> {
   await postToSlack(webhookUrl, {
     text: '✅ EduClip EWS — Slack 연동 테스트 메시지입니다.',
