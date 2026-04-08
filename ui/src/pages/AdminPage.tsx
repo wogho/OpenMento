@@ -1,16 +1,18 @@
 /**
- * 관리자 허브 (Phase 2-6 기준 좌측 사이드바 + 탭 구조)
+ * 관리자 허브 (Phase 3-4 기준 좌측 사이드바 + 탭 구조)
  * - 원장 대시보드 (PrincipalDashboard)
  * - 강사 대시보드 (InstructorDashboard)
  * - 교재 관리 (DocumentManager)
  * - EWS 대시보드 (EwsDashboard)
+ * - 스킬 파일 관리 (SkillManager)     ← Phase 3-4 신규
+ * - 에이전트 설정 (AgentConfigurator) ← Phase 3-4 신규
  * - 스케줄 설정 (ScheduleSettings)
  * - EWS 임계치 (ThresholdSettings)
  * - 알림 채널 (NotificationSettings)
  * - 보안 키 관리 (SecretsManager)
  */
 
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import DocumentManager from './admin/DocumentManager';
@@ -23,11 +25,17 @@ import ThresholdSettings from './admin/ThresholdSettings';
 import NotificationSettings from './admin/NotificationSettings';
 import BudgetManagement from './admin/BudgetManagement';
 
+// md-editor(~1MB)는 해당 탭 진입 시점에만 로드
+const SkillManager     = lazy(() => import('./admin/SkillManager'));
+const AgentConfigurator = lazy(() => import('./admin/AgentConfigurator'));
+
 type AdminTab =
   | 'principal'
   | 'instructor'
   | 'documents'
   | 'ews'
+  | 'skills'
+  | 'agents'
   | 'schedule'
   | 'thresholds'
   | 'notifications'
@@ -49,6 +57,8 @@ export default function AdminPage() {
     { id: 'instructor',    label: '강사 대시보드',   icon: '👨‍🏫', group: '대시보드' },
     { id: 'ews',           label: 'EWS 대시보드',   icon: '🚨', group: '대시보드' },
     { id: 'documents',     label: '교재 관리',       icon: '📚', group: '콘텐츠' },
+    { id: 'skills',        label: '스킬 파일 관리',  icon: '🧠', group: '콘텐츠' },
+    { id: 'agents',        label: '에이전트 설정',   icon: '🤖', group: '콘텐츠' },
     { id: 'schedule',      label: '스케줄 설정',     icon: '📅', group: '설정' },
     { id: 'thresholds',    label: 'EWS 임계치',      icon: '🎚️', group: '설정' },
     { id: 'notifications', label: '알림 채널',       icon: '🔔', group: '설정' },
@@ -120,6 +130,8 @@ export default function AdminPage() {
                activeTab === 'instructor'    ? '강사별 수강생 현황 · EWS 허위 양성 처리' :
                activeTab === 'documents'     ? 'RAG 파이프라인 연동 교재' :
                activeTab === 'ews'           ? 'EWS 위험 감지 · 자동 상담 예약 · 멘탈케어 메시지' :
+               activeTab === 'skills'        ? 'AI 강사 스킬 파일 작성 · 저장 즉시 프롬프트 반영' :
+               activeTab === 'agents'        ? '에이전트 등록 · 모델 선택 · 예산 · 스킬 파일 연결' :
                activeTab === 'schedule'      ? '루틴 스케줄 활성화 및 크론 표현식 관리' :
                activeTab === 'thresholds'    ? 'EWS 점수 가중치 · 위험 판정 기준 조정' :
                activeTab === 'notifications' ? 'Slack Webhook URL · 에스컬레이션 정책' :
@@ -130,15 +142,19 @@ export default function AdminPage() {
 
           {/* 콘텐츠 영역 렌더링 */}
           <div className="animate-fade-in">
-            {activeTab === 'principal'     && <PrincipalDashboard />}
-            {activeTab === 'instructor'    && <InstructorDashboard />}
-            {activeTab === 'documents'     && <DocumentManager />}
-            {activeTab === 'ews'           && <EwsDashboard />}
-            {activeTab === 'schedule'      && <ScheduleSettings />}
-            {activeTab === 'thresholds'    && <ThresholdSettings />}
-            {activeTab === 'notifications' && <NotificationSettings />}
-            {activeTab === 'budget'        && <BudgetManagement />}
-            {activeTab === 'secrets'       && <SecretsManager />}
+            <Suspense fallback={<div className="flex justify-center py-20 text-gray-400 text-sm">로딩 중…</div>}>
+              {activeTab === 'principal'     && <PrincipalDashboard />}
+              {activeTab === 'instructor'    && <InstructorDashboard />}
+              {activeTab === 'documents'     && <DocumentManager />}
+              {activeTab === 'ews'           && <EwsDashboard />}
+              {activeTab === 'skills'        && <SkillManager />}
+              {activeTab === 'agents'        && <AgentConfigurator />}
+              {activeTab === 'schedule'      && <ScheduleSettings />}
+              {activeTab === 'thresholds'    && <ThresholdSettings />}
+              {activeTab === 'notifications' && <NotificationSettings />}
+              {activeTab === 'budget'        && <BudgetManagement />}
+              {activeTab === 'secrets'       && <SecretsManager />}
+            </Suspense>
           </div>
         </div>
       </main>
