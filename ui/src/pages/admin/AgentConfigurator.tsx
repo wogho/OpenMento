@@ -9,7 +9,7 @@
  * 삭제: DELETE /admin/agents/:id
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../hooks/useAuth';
@@ -80,6 +80,75 @@ function RecommendedBadge() {
   );
 }
 
+/* ─────────────────────── 에이전트 조직도 트리 노드 ─────────────────────── */
+
+function AgentTreeNode({
+  agent,
+  allAgents,
+  depth,
+  selectedId,
+  isCreating,
+  onSelect,
+  onDelete,
+}: {
+  agent: Agent;
+  allAgents: Agent[];
+  depth: number;
+  selectedId: string | null;
+  isCreating: boolean;
+  onSelect: (a: Agent) => void;
+  onDelete: (a: Agent) => void;
+}) {
+  const children = allAgents.filter((a) => a.reportsTo === agent.id);
+  const roleLabel = ROLES.find((r) => r.value === agent.role)?.label ?? agent.role;
+  const isSelected = selectedId === agent.id && !isCreating;
+
+  return (
+    <>
+      <li
+        onClick={() => onSelect(agent)}
+        className={`py-2.5 pr-3 cursor-pointer transition-colors group border-b border-gray-50 ${
+          isSelected ? 'bg-blue-50 border-l-2 border-blue-500' : 'hover:bg-gray-50'
+        }`}
+        style={{ paddingLeft: `${depth * 16 + 12}px` }}
+      >
+        <div className="flex items-start gap-1.5">
+          {depth > 0 && (
+            <span className="text-gray-300 text-xs mt-0.5 shrink-0 select-none">└</span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-800 truncate">{agent.name}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{roleLabel}</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agent.isActive ? 'bg-green-400' : 'bg-gray-300'}`} />
+              <span className="text-[10px] text-gray-400 truncate">{agent.adapterConfig.model}</span>
+            </div>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(agent); }}
+            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs p-1 rounded transition shrink-0"
+            title="삭제"
+          >
+            🗑️
+          </button>
+        </div>
+      </li>
+      {children.map((child) => (
+        <AgentTreeNode
+          key={child.id}
+          agent={child}
+          allAgents={allAgents}
+          depth={depth + 1}
+          selectedId={selectedId}
+          isCreating={isCreating}
+          onSelect={onSelect}
+          onDelete={onDelete}
+        />
+      ))}
+    </>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    메인 컴포넌트
 ══════════════════════════════════════════════════════════════════════ */
@@ -103,6 +172,14 @@ export default function AgentConfigurator() {
 
   const watchedRole = watch('role') as AgentRole;
   const watchedModel = watch('model');
+
+  /* ── 이탈 방지: isDirty 새로고침/스균 닫기 대비 ── */
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   /* ── 에이전트 목록 조회 ── */
   const { data: agents = [], isLoading } = useQuery<Agent[]>({
@@ -132,6 +209,7 @@ export default function AgentConfigurator() {
 
   /* ── 에이전트 선택 → 폼 채우기 ── */
   const handleSelect = (agent: Agent) => {
+    if (isDirty && !window.confirm('저장하지 않은 내용이 있습니다. 정말 이동하시겠습니까?')) return;
     setSelectedId(agent.id);
     setIsCreating(false);
     setErrorMsg('');
@@ -149,6 +227,7 @@ export default function AgentConfigurator() {
 
   /* ── 신규 생성 모드 ── */
   const handleNew = () => {
+    if (isDirty && !window.confirm('저장하지 않은 내용이 있습니다. 새 에이전트를 등록하시겠습니까?')) return;
     setSelectedId(null);
     setIsCreating(true);
     setErrorMsg('');
@@ -245,54 +324,36 @@ export default function AgentConfigurator() {
           </button>
         </div>
 
-        <ul className="flex-1 overflow-y-auto divide-y divide-gray-100">
+        <ul className="flex-1 overflow-y-auto">
           {isLoading && <li className="p-4 text-sm text-gray-400 text-center">불러오는 중…</li>}
 
           {/* 신규 생성 중 가상 항목 */}
           {isCreating && (
-            <li className="px-4 py-3 bg-blue-50 border-l-2 border-blue-500">
+            <li className="px-4 py-3 bg-blue-50 border-l-2 border-blue-500 border-b border-gray-50">
               <p className="text-sm font-medium text-blue-700">신규 에이전트</p>
               <p className="text-xs text-blue-400 mt-0.5">설정 후 저장</p>
             </li>
           )}
 
-          {agents.map((agent) => {
-            const roleLabel = ROLES.find((r) => r.value === agent.role)?.label ?? agent.role;
-            return (
-              <li
-                key={agent.id}
-                onClick={() => handleSelect(agent)}
-                className={`px-4 py-3 cursor-pointer transition group ${
-                  selectedId === agent.id && !isCreating
-                    ? 'bg-blue-50 border-l-2 border-blue-500'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{agent.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{roleLabel}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span className={`w-1.5 h-1.5 rounded-full ${agent.isActive ? 'bg-green-400' : 'bg-gray-300'}`} />
-                      <span className="text-[10px] text-gray-400">{agent.adapterConfig.model}</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`"${agent.name}" 에이전트를 삭제하시겠습니까?`)) {
-                        deleteMutation.mutate(agent.id);
-                      }
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs p-1 rounded transition"
-                    title="삭제"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </li>
-            );
-          })}
+          {/* 조직도 트리: reportsTo 없는 루트 에이전트부터 재귀 렌더링 */}
+          {agents
+            .filter((a) => !a.reportsTo || !agents.some((p) => p.id === a.reportsTo))
+            .map((root) => (
+              <AgentTreeNode
+                key={root.id}
+                agent={root}
+                allAgents={agents}
+                depth={0}
+                selectedId={selectedId}
+                isCreating={isCreating}
+                onSelect={handleSelect}
+                onDelete={(agent) => {
+                  if (confirm(`"${agent.name}" 에이전트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+                    deleteMutation.mutate(agent.id);
+                  }
+                }}
+              />
+            ))}
         </ul>
       </aside>
 

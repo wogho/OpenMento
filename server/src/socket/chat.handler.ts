@@ -13,7 +13,7 @@
 import type { Server as SocketServer } from 'socket.io';
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
-import { verify } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { tutorChat } from '../services/tutor-agent.js';
 
 interface JwtPayload {
@@ -55,7 +55,7 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
       const secret = process.env.JWT_SECRET;
       if (!secret) return next(new Error('서버 설정 오류'));
 
-      const payload = verify(token, secret) as JwtPayload;
+      const payload = jwt.verify(token, secret) as JwtPayload;
       socket.data.userId = payload.sub;
       socket.data.institutionId = payload.institutionId;
       socket.data.role = payload.role;

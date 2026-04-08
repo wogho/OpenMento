@@ -99,7 +99,7 @@ router.get('/documents', async (req, res) => {
   // 청크 단위로 저장되므로 소스 파일명 기준으로 그룹핑 후 대표 id/createdAt 반환
   const docs = await db
     .select({
-      id: sql<string>`MIN(${ragDocuments.id})`,
+      id: sql<string>`MIN(${ragDocuments.id}::text)`,
       filename: ragDocuments.sourceFileName,
       createdAt: sql<string>`MIN(${ragDocuments.createdAt})`,
     })
@@ -673,6 +673,22 @@ router.delete('/skills/:id', async (req, res) => {
 
   if (!existing) {
     res.status(404).json({ error: '스킬을 찾을 수 없습니다.' });
+    return;
+  }
+
+  // H-1: 에이전트가 이 스킬을 현재 사용 중이면 409 반환
+  if (existing.agentId) {
+    const [linkedAgent] = await db
+      .select({ name: agents.name })
+      .from(agents)
+      .where(eq(agents.id, existing.agentId))
+      .limit(1);
+
+    res.status(409).json({
+      error: `이 스킬 파일은 현재 '${linkedAgent?.name ?? '에이전트'}' 에 사용 중입니다. 에이전트와의 연결을 먼저 해제해 주세요.`,
+      agentId: existing.agentId,
+      agentName: linkedAgent?.name ?? null,
+    });
     return;
   }
 
