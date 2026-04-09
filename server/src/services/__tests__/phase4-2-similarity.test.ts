@@ -40,6 +40,7 @@ const {
   mockSelectFrom,
   mockSelectWhere,
   mockEmbedText,
+  mockEmbedBatch,
   mockChat,
 } = vi.hoisted(() => {
   const mockInsertReturning = vi.fn();
@@ -53,6 +54,7 @@ const {
   const mockUpdate          = vi.fn(() => ({ set: mockUpdateSet }));
   const mockSelect          = vi.fn(() => ({ from: mockSelectFrom }));
   const mockEmbedText       = vi.fn();
+  const mockEmbedBatch      = vi.fn();
   const mockChat            = vi.fn();
 
   const mockDb = {
@@ -72,6 +74,7 @@ const {
     mockSelectFrom,
     mockSelectWhere,
     mockEmbedText,
+    mockEmbedBatch,
     mockChat,
   };
 });
@@ -96,6 +99,7 @@ vi.mock('@educlip/rag', async () => {
   return {
     ...actual,
     embedText: mockEmbedText,
+    embedBatch: mockEmbedBatch,
   };
 });
 
@@ -279,7 +283,7 @@ describe('Phase 4-2: seedGraduatePortfolios', () => {
     expect(mockDb.select).not.toHaveBeenCalled();
   });
 
-  it('Seed② API 키 있을 때 embedding 미보유 프로젝트 임베딩 후 업데이트', async () => {
+  it('Seed② API 키 있을 때 embedding 미보유 프로젝트 배치 임베딩 후 업데이트', async () => {
     process.env.OPENAI_API_KEY = 'test-key';
 
     mockSelectWhere.mockResolvedValue([
@@ -287,13 +291,20 @@ describe('Phase 4-2: seedGraduatePortfolios', () => {
       { id: 'proj-2', proposalText: '기획서 텍스트 2', techStack: 'Vue' },
       { id: 'proj-3', proposalText: null, techStack: null },
     ]);
-    mockEmbedText.mockResolvedValue(FAKE_EMBEDDING);
+    // embedBatch: 유효한 2건을 한 번에 처리
+    mockEmbedBatch.mockResolvedValue([FAKE_EMBEDDING, FAKE_EMBEDDING]);
     mockUpdateWhere.mockResolvedValue([]);
 
     const result = await seedGraduatePortfolios();
     expect(result.seeded).toBe(2);   // proj-1, proj-2
     expect(result.skipped).toBe(1);  // proj-3 (proposalText 없음)
-    expect(mockEmbedText).toHaveBeenCalledTimes(2);
+    // embedBatch가 한 번만 호출되어야 함 (배칭 처리)
+    expect(mockEmbedBatch).toHaveBeenCalledTimes(1);
+    expect(mockEmbedBatch).toHaveBeenCalledWith([
+      '기획서 텍스트 1\nReact',
+      '기획서 텍스트 2\nVue',
+    ]);
+    // update는 배치의 각 항목마다 호출
     expect(mockDb.update).toHaveBeenCalledTimes(2);
   });
 });

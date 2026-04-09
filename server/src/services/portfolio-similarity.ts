@@ -24,7 +24,7 @@ import {
   and,
   sql,
 } from '@educlip/db';
-import { embedText } from '@educlip/rag';
+import { embedText, embedBatch } from '@educlip/rag';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { LlmMessage } from '../adapters/index.js';
 
@@ -102,20 +102,27 @@ export async function analyzePortfolioSimilarity(
   //    - 승인된(approved) 수료생 프로젝트만 비교
   //    - 임베딩이 있는 것만 (seed 데이터 포함)
   //    - cosine_distance 기준 상위 1개 (최대 유사도)
-  const vectorLiteral = `[${embedding.join(',')}]`;
+  //
+  // ✅ 개선①: 벡터를 드라이버 파라미터($1::vector)로 바인딩하여 30KB 리터럴 인라인 방지.
+  // sql 템플릿 태그는 ${} 보간값을 자동으로 파라미터 바인딩하므로,
+  // CTE 형태로 벡터를 한 번만 선언해 ORDER BY/SELECT 양쪽에서 재사용합니다.
+  const vectorParam = `[${embedding.join(',')}]`;
 
   const rows = await db.execute(sql`
+    WITH query_vec AS (
+      SELECT ${vectorParam}::vector AS v
+    )
     SELECT
-      id,
-      1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
-    FROM portfolio_projects
+      pp.id,
+      1 - (pp.embedding <=> qv.v) AS similarity
+    FROM portfolio_projects pp, query_vec qv
     WHERE
-      id <> ${projectId}
-      AND institution_id = ${institutionId}
-      AND status = 'approved'
-      AND embedding IS NOT NULL
-      AND deleted_at IS NULL
-    ORDER BY embedding <=> ${vectorLiteral}::vector
+      pp.id <> ${projectId}
+      AND pp.institution_id = ${institutionId}
+      AND pp.status = 'approved'
+      AND pp.embedding IS NOT NULL
+      AND pp.deleted_at IS NULL
+    ORDER BY pp.embedding <=> qv.v
     LIMIT 1
   `);
 
@@ -216,17 +223,18 @@ async function generateFeedback(opts: FeedbackOptions): Promise<string> {
       '스스로 차별화 아이디어를 발견하도록 유도합니다. ' +
       '질문은 3개 이내로 간결하게 작성하세요.';
 
+    // ✅ 개선②: gpt-4o·claude-sonnet-4-5는 128k+ 컨텍스트 지원 → 600자에서 8000자로 확장
     if (verdict === 'differentiation_required') {
       userPrompt =
         `수강생의 포트폴리오 기획서가 역대 프로젝트와 ${scorePercent}% 유사합니다.\n` +
         `질문을 통해 차별화 방향을 스스로 찾도록 도와주세요.\n\n` +
-        `[기획서 요약]\n${proposalText.slice(0, 600)}`;
+        `[기획서 전문]\n${proposalText.slice(0, 8000)}`;
     } else {
       userPrompt =
         `수강생의 포트폴리오 기획서가 역대 프로젝트와 ${scorePercent}% 유사합니다. ` +
         `일부 개선이 필요합니다.\n` +
         `질문으로 개선 방향을 함께 탐색해 주세요.\n\n` +
-        `[기획서 요약]\n${proposalText.slice(0, 600)}`;
+        `[기획서 전문]\n${proposalText.slice(0, 8000)}`;
     }
   } else {
     // 직접 제안 — 차별화 요소 3개 명시
@@ -241,14 +249,14 @@ async function generateFeedback(opts: FeedbackOptions): Promise<string> {
         `차별화가 필수입니다.\n\n` +
         `구체적인 차별화 요소 3가지를 제안해 주세요. ` +
         `각 항목은 "- [차별화 요소]: [구체적인 방법]" 형식으로 작성하세요.\n\n` +
-        `[기획서 요약]\n${proposalText.slice(0, 600)}`;
+        `[기획서 전문]\n${proposalText.slice(0, 8000)}`;
     } else {
       userPrompt =
         `수강생의 포트폴리오 기획서가 역대 프로젝트와 ${scorePercent}% 유사합니다. ` +
         `일부 개선을 권장합니다.\n\n` +
         `개선 방향 3가지를 제안해 주세요. ` +
         `각 항목은 "- [개선 영역]: [구체적인 방법]" 형식으로 작성하세요.\n\n` +
-        `[기획서 요약]\n${proposalText.slice(0, 600)}`;
+        `[기획서 전문]\n${proposalText.slice(0, 8000)}`;
     }
   }
 
@@ -304,22 +312,28 @@ export async function seedGraduatePortfolios(): Promise<{ seeded: number; skippe
       ),
     );
 
-  let seeded = 0;
-  let skipped = 0;
+  // ✅ 개선③: FOR 루프 개별 embedText() 대신 embedBatch()로 한 번에 처리.
+  // OpenAI API Rate Limit을 배치 단위로 효율적으로 사용하고 네트워크 RTT를 절감합니다.
+  const validRows = rows.filter((r) => !!r.proposalText);
+  const skipped   = rows.length - validRows.length;
 
-  for (const row of rows) {
-    if (!row.proposalText) { skipped++; continue; }
+  if (validRows.length === 0) return { seeded: 0, skipped };
 
-    const text = [row.proposalText, row.techStack].filter(Boolean).join('\n');
-    const embedding = await embedText(text);
+  const texts = validRows.map((r) =>
+    [r.proposalText, r.techStack].filter(Boolean).join('\n'),
+  );
 
-    await db
-      .update(portfolioProjects)
-      .set({ embedding: embedding as unknown as undefined, updatedAt: new Date() })
-      .where(eq(portfolioProjects.id, row.id));
+  const embeddings = await embedBatch(texts);
 
-    seeded++;
-  }
+  const updatedAt = new Date();
+  await Promise.all(
+    validRows.map((row, i) =>
+      db
+        .update(portfolioProjects)
+        .set({ embedding: embeddings[i] as unknown as undefined, updatedAt })
+        .where(eq(portfolioProjects.id, row.id)),
+    ),
+  );
 
-  return { seeded, skipped };
+  return { seeded: validRows.length, skipped };
 }
