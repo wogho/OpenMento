@@ -29,6 +29,7 @@ import BudgetManagement from './admin/BudgetManagement';
 const SkillManager      = lazy(() => import('./admin/SkillManager'));
 const AgentConfigurator = lazy(() => import('./admin/AgentConfigurator'));
 const PortfolioSettings = lazy(() => import('./admin/PortfolioSettings'));
+const SystemMonitor     = lazy(() => import('./admin/SystemMonitor'));
 
 type AdminTab =
   | 'principal'
@@ -42,7 +43,8 @@ type AdminTab =
   | 'notifications'
   | 'budget'
   | 'secrets'
-  | 'portfolio-settings';
+  | 'portfolio-settings'
+  | 'system';
 
 export default function AdminPage() {
   const { user, logout } = useAuth();
@@ -67,6 +69,7 @@ export default function AdminPage() {
     { id: 'budget',        label: '예산 관리',       icon: '💰', group: '설정' },
     { id: 'secrets',            label: '보안 키 관리',       icon: '🔑', group: '설정' },
     { id: 'portfolio-settings', label: '포트폴리오 설정',    icon: '📋', group: '설정' },
+    { id: 'system',             label: '시스템 모니터링',    icon: '📊', group: '시스템' },
   ];
 
   return (
@@ -141,8 +144,7 @@ export default function AdminPage() {
                activeTab === 'thresholds'    ? 'EWS 점수 가중치 · 위험 판정 기준 조정' :
                activeTab === 'notifications' ? 'Slack Webhook URL · 에스컬레이션 정책' :
                activeTab === 'budget'              ? 'LLM 토큰 비용 추적 · 월 예산 한도 · Soft Alert 설정' :
-               activeTab === 'portfolio-settings' ? '유사도 임계값 · AI 피드백 스타일 · 비교 대상 범위 구성' :
-               '외부 연동 API 암호화 센터'}
+               activeTab === 'portfolio-settings' ? '유사도 임계값 · AI 피드백 스타일 · 비교 대상 범위 구성' :               activeTab === 'system'             ? 'API·DB·Redis·스케줄러 상태 · 에이전트 실행 이력 · 서비스 재시작' :               '외부 연동 API 암호화 센터'}
             </p>
           </header>
 
@@ -161,6 +163,7 @@ export default function AdminPage() {
               {activeTab === 'budget'             && <BudgetManagement />}
               {activeTab === 'secrets'            && <SecretsManager />}
               {activeTab === 'portfolio-settings' && <PortfolioSettings />}
+              {activeTab === 'system'             && <SystemMonitor />}
             </Suspense>
           </div>
         </div>

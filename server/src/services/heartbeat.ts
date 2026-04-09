@@ -31,6 +31,7 @@ import { issueAgentToken } from './agent-auth-jwt.js';
 import { runEwsMonitor } from './ews-monitor.js';
 import { sendEwsEscalations } from './slack-notifier.js';
 import { logger } from '../utils/logger.js';
+import { io } from '../socket/chat.handler.js';
 
 // ── 환경 변수 ────────────────────────────────────────────────────────────────
 
@@ -350,6 +351,14 @@ async function runHeartbeatForAgent(
         .where(eq(heartbeatRuns.id, runId));
 
       logger.info(`[heartbeat] 완료: agent="${agent.name}" runId=${runId}`);
+      // Phase 5-4: Admin 룸에 에이전트 실행 완료 실시간 Push
+      io?.to(`admin:${agent.institutionId}`).emit('agent:status_change', {
+        agentId: agent.id,
+        agentName: agent.name,
+        runId,
+        status: 'completed',
+        finishedAt: new Date().toISOString(),
+      });
     } else {
       await db
         .update(heartbeatRuns)
@@ -365,6 +374,15 @@ async function runHeartbeatForAgent(
       logger.error(
         `[heartbeat] 실패: agent="${agent.name}" runId=${runId} error="${result.errorMessage}"`,
       );
+      // Phase 5-4: Admin 룸에 에이전트 실행 실패 실시간 Push
+      io?.to(`admin:${agent.institutionId}`).emit('agent:status_change', {
+        agentId: agent.id,
+        agentName: agent.name,
+        runId,
+        status: 'failed',
+        finishedAt: new Date().toISOString(),
+        errorMessage: result.errorMessage,
+      });
     }
   } catch (err) {
     // ── 10. 예외 시 실패 처리 ────────────────────────────────

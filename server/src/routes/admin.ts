@@ -46,6 +46,7 @@ import { getInstitutionSetting, setInstitutionSetting } from '../services/instit
 import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
+import systemRouter from './system.js';
 
 const router: ReturnType<typeof Router> = Router();
 
@@ -1816,5 +1817,10 @@ router.put('/portfolio-settings', requireRole('admin'), async (req, res) => {
   await setPortfolioSettings(institutionId, parsed.data);
   res.status(200).json(parsed.data);
 });
+
+// ── Phase 5-4: 시스템 상태 모니터링 하위 라우터 ─────────────────────────────
+// adminRouter가 이미 authenticate + requireRole('admin') 를 적용하므로
+// /admin/system/* 전체가 admin 전용으로 보호됩니다.
+router.use('/system', systemRouter);
 
 export default router;

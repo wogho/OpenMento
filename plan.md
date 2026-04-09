@@ -626,10 +626,10 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 ### 5-4. 시스템 상태 모니터링 UI
 
 **작업 항목**:
-- [ ] 서비스 상태 대시보드 구현 (API 서버 / DB / AI 스케줄러 / 외부 연동)
-- [ ] 에이전트별 실행 상태 실시간 표시 (WebSocket)
-- [ ] "서비스 재시작" 버튼 구현 (Docker API 연동 또는 pm2 명령)
-- [ ] 오류 발생 시 "[로그 보기]" 버튼 → `heartbeat_runs.stdoutExcerpt` 표시
+- [x] 서비스 상태 대시보드 구현 (API 서버 / DB / Redis / AI 스케줄러)
+- [x] 에이전트별 실행 상태 실시간 표시 (WebSocket `agent:status_change`)
+- [x] "서비스 재시작" 버튼 구현 (SIGTERM self-send → Docker restart: unless-stopped 정책 활용)
+- [x] 오류 발생 시 "[로그 보기]" 버튼 → `heartbeat_runs.stdoutExcerpt` 모달 표시
 
 ---
 
@@ -663,7 +663,7 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 | 교재 드래그앤드롭 업로드 | `POST /admin/documents` | Phase 1 | 완료 |
 | LLM 모델 드롭다운 선택 | `PUT /admin/agents/:id` | Phase 3 | 완료 |
 | 큐 모니터링 대시보드 | `GET /admin/queues` | Phase 5 | 완료 |
-| 서비스 재시작 버튼 | `POST /admin/system/restart` | Phase 5 | - |
+| 서비스 재시작 버튼 | `POST /admin/system/restart` | Phase 5 | 완료 |
 
 ---
 
@@ -1287,3 +1287,53 @@ plan.md 5-3 시나리오 그대로 반영:
 ---
 
 **테스트 현황**: 311개 전체 통과 (신규 33개 포함) / tsc 오류 0개
+
+---
+
+## 부록 M. Phase 5-4 시스템 상태 모니터링 UI 구현 이력 (2026-04-09)
+
+### M-1. 서비스 상태 대시보드 구현 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **API** | `GET /admin/system/status` — API·DB·Redis·AI Scheduler 4가지 서비스 헬스 집계 반환 |
+| **DB 체크** | `SELECT 1` 응답 시간 측정 → 정상/다운 판별 |
+| **Redis 체크** | `REDIS_URL` 있으면 ioredis `ping()` 수행, 없으면 `unavailable` 표시 |
+| **스케줄러 체크** | `getHeartbeatStatus()` 호출 → `isRunning`, `currentConcurrentRuns` 표시 |
+| **응답 구조** | `{ services[], uptime, memoryMb, timestamp }` |
+
+**신규 파일**: `server/src/services/system-status.ts`, `server/src/routes/system.ts`  
+**수정 파일**: `server/src/routes/admin.ts` (systemRouter 하위 마운트 `/admin/system`)
+
+---
+
+### M-2. 에이전트별 실행 상태 실시간 WebSocket ✅
+
+| 항목 | 내용 |
+|---|---|
+| **이벤트** | `agent:status_change` — heartbeat 완료/실패 시 `admin:<institutionId>` 룸에 emit |
+| **페이로드** | `{ agentId, agentName, runId, status, finishedAt, errorMessage? }` |
+| **구현 위치** | `heartbeat.ts` — completed/failed 기록 직후 `io?.to(...).emit(...)` 삽입 |
+| **프론트엔드** | `SystemMonitor.tsx` — `recentEvents` state에 최근 20개 누적 + 쿼리 자동 무효화 |
+
+**수정 파일**: `server/src/services/heartbeat.ts`
+
+---
+
+### M-3. UI 대시보드 (SystemMonitor.tsx) ✅
+
+| 항목 | 내용 |
+|---|---|
+| **서비스 카드** | 4개 서비스 상태 카드 (ok/degraded/down/unavailable/stopped 색상 구분) |
+| **에이전트 테이블** | 역할·상태·마지막 실행 시각·소요 시간 표시 + 실시간 `.animate-pulse` 인디케이터 |
+| **로그 보기** | `stdoutExcerpt` 전체 내용 모달 표시 (`pre` 태그 + monospace) |
+| **서비스 재시작** | 확인 다이얼로그 → `POST /admin/system/restart` → SIGTERM self-send |
+| **자동 갱신** | React Query `refetchInterval: 30_000` |
+| **Admin 탭** | `AdminPage.tsx` — `system` (`📊 시스템 모니터링`) 탭 추가 |
+
+**신규 파일**: `ui/src/pages/admin/SystemMonitor.tsx`  
+**수정 파일**: `ui/src/pages/AdminPage.tsx`
+
+---
+
+**테스트 현황**: 358개 전체 통과 (신규 47개 포함) / tsc 오류 0개 (신규 파일 기준)
