@@ -23,6 +23,8 @@ import {
   advanceWorkflow,
   getWorkflowState,
   processHitlReview,
+  getActiveWorkflow,
+  saveDraft,
 } from '../services/portfolio-orchestrator.js';
 import { getIndustryList } from '../services/persona-prompts.js';
 import {
@@ -72,6 +74,25 @@ const personaUpdateSchema = personaCreateSchema.partial().extend({
 });
 
 const goalIdSchema = z.string().uuid({ message: 'goalId는 UUID여야 합니다.' });
+
+// ── GET /portfolio/active — 수강생의 진행 중인 세션 복구 (개선①) ─────────────
+
+router.get('/active', async (req, res) => {
+  const { sub: studentId } = req.user!;
+  try {
+    const state = await getActiveWorkflow(studentId);
+    if (!state) {
+      res.status(404).json({ error: '진행 중인 포트폴리오 세션이 없습니다.' });
+      return;
+    }
+    res.json(state);
+  } catch (err) {
+    const error = err as Error & { statusCode?: number };
+    res.status(error.statusCode ?? 500).json({
+      error: error.message ?? '세션 조회 중 오류가 발생했습니다.',
+    });
+  }
+});
 
 // ── GET /portfolio/personas — 선택 가능한 산업 페르소나 목록 ─────────────────
 // (DB 기반 + 레거시 폴백)
@@ -166,6 +187,98 @@ router.post('/:goalId/message', async (req, res) => {
     const error = err as Error & { statusCode?: number };
     res.status(error.statusCode ?? 500).json({
       error: error.message ?? '워크플로우를 진행하는 중 오류가 발생했습니다.',
+    });
+  }
+});
+
+// ── POST /portfolio/:goalId/message/stream — SSE 스트리밍 응답 (개선③) ────────
+// 전체 응답을 한번에 주는 대신 단어 단위로 SSE 청크를 송출해 타이핑 UX 구현.
+router.post('/:goalId/message/stream', async (req, res) => {
+  const { goalId } = req.params;
+
+  const goalIdParsed = goalIdSchema.safeParse(goalId);
+  if (!goalIdParsed.success) {
+    res.status(400).json({ error: goalIdParsed.error.flatten() });
+    return;
+  }
+
+  const parsed = messageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.' });
+    return;
+  }
+
+  const { sub: studentId } = req.user!;
+
+  // SSE 헤더 설정
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Nginx 버퍼링 비활성화
+  res.flushHeaders();
+
+  const sendEvent = (payload: object) => {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  try {
+    // 1. 전체 응답 처리 (기존 advanceWorkflow 재사용)
+    const state = await advanceWorkflow({
+      goalId,
+      studentId,
+      userMessage: parsed.data.content,
+    });
+
+    // 2. 마지막 에이전트 응답 메시지 추출
+    const lastMsg = state.messages.at(-1);
+    const fullText = lastMsg?.content ?? '';
+
+    // 3. 단어 단위 스트리밍 (자연스러운 타이핑 속도: 단어 당 30~70ms)
+    const words = fullText.split(/(?<=\s)/); // 공백 뒤에서 분리 (공백 포함)
+    for (const word of words) {
+      sendEvent({ type: 'chunk', text: word });
+      // 비동기 지연 (Node.js 이벤트 루프 양보)
+      await new Promise<void>((resolve) => setTimeout(resolve, 30 + Math.random() * 40));
+    }
+
+    // 4. 완료 이벤트: 최종 워크플로우 상태 전송
+    sendEvent({ type: 'done', state });
+    res.end();
+  } catch (err) {
+    const error = err as Error;
+    sendEvent({ type: 'error', message: error.message ?? '워크플로우 오류가 발생했습니다.' });
+    res.end();
+  }
+});
+
+// ── PUT /portfolio/:goalId/draft — 기획서 임시 저장 (개선②) ─────────────────
+
+const draftSchema = z.object({
+  proposalText: z.string().max(50000, '기획서는 50,000자 이하여야 합니다.'),
+});
+
+router.put('/:goalId/draft', async (req, res) => {
+  const { goalId } = req.params;
+
+  const goalIdParsed = goalIdSchema.safeParse(goalId);
+  if (!goalIdParsed.success) {
+    res.status(400).json({ error: goalIdParsed.error.flatten() });
+    return;
+  }
+
+  const parsed = draftSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청 형식이 올바르지 않습니다.' });
+    return;
+  }
+
+  try {
+    await saveDraft(goalId, parsed.data.proposalText);
+    res.json({ ok: true });
+  } catch (err) {
+    const error = err as Error & { statusCode?: number };
+    res.status(error.statusCode ?? 500).json({
+      error: error.message ?? '임시 저장 중 오류가 발생했습니다.',
     });
   }
 });

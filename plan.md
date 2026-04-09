@@ -858,3 +858,31 @@ github api
 ---
 
 **테스트 현황**: 145개 전체 통과 (Phase 4-1 개선 신규 18개 포함)
+
+---
+
+## 부록 I. Phase 4-3 완료 후 개선 반영 이력
+
+### I-1. 세션 복구 로직 (Session Resumption) ✅
+- `getActiveWorkflow(studentId)` 오케스트레이터 함수 추가  
+  - `portfolioProjects` 최근 비완료 세션 조회 (`status NOT IN ('approved','abandoned')`)  
+  - `goals.sharedContext->>'projectId'` JSON 경로로 학습목표 매칭  
+- `GET /portfolio/active` REST 엔드포인트 추가 → 404 or `WorkflowState`  
+- `PortfolioPage` 마운트 시 자동 복구: `stageToPhase()` 헬퍼로 FSM stage → UI 단계 매핑  
+- 복구 중 "이전 세션을 복구하는 중…" 로딩 화면 표시
+
+### I-2. 기획서 자동 저장 (Auto-save Draft) ✅
+- `saveDraft(goalId, proposalText)` 오케스트레이터 함수 추가  
+  - `portfolioProjects.proposalText` + `goals.sharedContext.proposalDraft` 동시 업데이트  
+- `PUT /portfolio/:goalId/draft` REST 엔드포인트 추가 (`draftSchema` Zod 검증)  
+- `PortfolioPage` `useEffect`: `proposalText` 변경 시 `localStorage` 즉시 저장 + 3초 디바운스 후 서버 동기화  
+- `draftSaveStatus` ('idle'|'saving'|'saved') UI 피드백 표시
+
+### I-3. SSE 스트리밍 인터뷰 UX ✅
+- `POST /portfolio/:goalId/message/stream` SSE 엔드포인트 추가  
+  - `text/event-stream` 헤더, 단어 단위 30–70 ms 지연 청크 스트리밍  
+  - `{ type:'chunk', text }` + `{ type:'done', state }` 이벤트 구조  
+- `InterviewChat.tsx`: `streamingContent?: string` prop 추가 → 실시간 타이핑 말풍선 + `animate-pulse` 커서  
+- `PortfolioPage.handleSendMessage`: `fetch` + `ReadableStream` + `TextDecoder` SSE 클라이언트로 전환
+
+**테스트 현황**: 161개 전체 통과 (UI TypeScript 컴파일 오류 0개)

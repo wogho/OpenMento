@@ -33,6 +33,7 @@ import {
   and,
   isNull,
   sql,
+  desc,
 } from '@educlip/db';
 import { getPersonaById, PERSONA_TEMPLATES } from './persona-prompts.js';
 import { createAdapterWithFallback } from '../adapters/index.js';
@@ -1024,4 +1025,87 @@ async function finalizeWorkflow(
     approvedAt: now,
     updatedAt: now,
   }).where(eq(portfolioProjects.id, projectId));
+}
+
+// ── 개선①: 세션 복구 — 학생의 가장 최근 활성 워크플로우 조회 ──────────────────
+
+/**
+ * 수강생의 진행 중인(active) 최근 포트폴리오 워크플로우를 반환합니다.
+ * 없으면 null 을 반환합니다. (세션 복구용)
+ */
+export async function getActiveWorkflow(studentId: string): Promise<WorkflowState | null> {
+  // 1. 수강생의 가장 최근 비완료 프로젝트 조회
+  const [project] = await db
+    .select({ id: portfolioProjects.id, status: portfolioProjects.status })
+    .from(portfolioProjects)
+    .where(
+      and(
+        eq(portfolioProjects.studentId, studentId),
+        sql`${portfolioProjects.status} NOT IN ('approved', 'abandoned')`,
+      ),
+    )
+    .orderBy(desc(portfolioProjects.updatedAt))
+    .limit(1);
+
+  if (!project) return null;
+
+  // 2. 해당 프로젝트와 연결된 활성 goal 조회 (sharedContext.projectId JSON 경로)
+  const [goalRow] = await db
+    .select()
+    .from(goals)
+    .where(
+      and(
+        eq(goals.status, 'active'),
+        sql`${goals.sharedContext}->>'projectId' = ${project.id}`,
+      ),
+    )
+    .orderBy(desc(goals.updatedAt))
+    .limit(1);
+
+  if (!goalRow) return null;
+
+  const ctx = goalRow.sharedContext as (SharedContext & { projectId?: string }) | null;
+  const stage = project.status as PortfolioStage;
+
+  return {
+    goalId: goalRow.id,
+    projectId: project.id,
+    stage,
+    messages: ctx?.messages ?? [],
+    awaitingUserInput: stage !== 'approved' && stage !== 'hitl_review',
+    awaitingInstructorReview: stage === 'hitl_review',
+    completed: false,
+    similarityScore: ctx?.similarityScore,
+  };
+}
+
+// ── 개선②: 기획서 임시 저장 (Draft Save) ────────────────────────────────────
+
+/**
+ * 기획서 초안을 DB에 저장합니다. (자동 저장용)
+ * portfolio_projects.proposalText + goals.sharedContext.proposalDraft 동기화.
+ */
+export async function saveDraft(goalId: string, proposalText: string): Promise<void> {
+  const projectId = await getProjectId(goalId);
+
+  // portfolio_projects 업데이트
+  await db
+    .update(portfolioProjects)
+    .set({ proposalText, updatedAt: new Date() })
+    .where(eq(portfolioProjects.id, projectId));
+
+  // sharedContext.proposalDraft 동기화
+  const [goalRow] = await db
+    .select({ sharedContext: goals.sharedContext })
+    .from(goals)
+    .where(eq(goals.id, goalId))
+    .limit(1);
+
+  if (goalRow) {
+    const ctx = (goalRow.sharedContext as SharedContext) ?? {};
+    await db
+      .update(goals)
+      .set({ sharedContext: { ...ctx, proposalDraft: proposalText }, updatedAt: new Date() })
+      .where(eq(goals.id, goalId));
+  }
 }
