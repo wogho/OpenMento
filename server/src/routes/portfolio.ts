@@ -31,6 +31,7 @@ import {
   updatePersona,
   deletePersona,
 } from '../services/persona-service.js';
+import { analyzePortfolioSimilarity } from '../services/portfolio-similarity.js';
 
 const router: ReturnType<typeof Router> = Router();
 
@@ -297,4 +298,66 @@ router.delete('/personas/:id', requireRole('instructor', 'admin'), async (req, r
   }
 });
 
+// ── 유사도 분석 ────────────────────────────────────────────────────────────
+
+const analyzeSchema = z.object({
+  projectId: z.string().uuid({ message: 'projectId는 UUID여야 합니다.' }),
+  proposalText: z
+    .string()
+    .min(50, '기획서 텍스트는 50자 이상이어야 합니다.')
+    .max(8000, '기획서 텍스트는 8000자 이하여야 합니다.'),
+  feedbackStyle: z.enum(['socratic', 'direct']).default('direct'),
+  compareScope: z.enum(['all', 'current_cohort']).default('all'),
+  courseId: z.string().uuid().optional(),
+  thresholdCritical: z.number().min(0).max(1).optional(),
+  thresholdWarning: z.number().min(0).max(1).optional(),
+});
+
+// POST /portfolio/analyze — 유사도 분석 실행 (Phase 4-2)
+router.post('/analyze', async (req, res) => {
+  const parsed = analyzeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: '입력값이 유효하지 않습니다.',
+      details: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const { institutionId } = req.user!;
+  const {
+    projectId,
+    proposalText,
+    feedbackStyle,
+    compareScope,
+    courseId,
+    thresholdCritical,
+    thresholdWarning,
+  } = parsed.data;
+
+  if (compareScope === 'current_cohort' && !courseId) {
+    return res.status(400).json({
+      error: "compareScope='current_cohort'일 때 courseId가 필요합니다.",
+    });
+  }
+
+  try {
+    const result = await analyzePortfolioSimilarity({
+      projectId,
+      proposalText,
+      feedbackStyle,
+      compareScope,
+      courseId,
+      institutionId,
+      ...(thresholdCritical !== undefined && { thresholdCritical }),
+      ...(thresholdWarning  !== undefined && { thresholdWarning  }),
+    });
+
+    return res.status(200).json(result);
+  } catch (err) {
+    const error = err as Error & { statusCode?: number };
+    return res.status(error.statusCode ?? 500).json({ error: error.message });
+  }
+});
+
 export default router;
+

@@ -57,6 +57,13 @@
       "when": 1775678748368,
       "tag": "0007_deep_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775715245330,
+      "tag": "0008_persona_templates_and_portfolio_seed",
+      "breakpoints": true
     }
   ]
 }

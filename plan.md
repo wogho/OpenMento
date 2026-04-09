@@ -539,10 +539,10 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 ```
 
 **작업 항목**:
-- [ ] `portfolio_projects` 테이블 임베딩 컬럼 추가 (pgvector)
-- [ ] 수료생 기존 프로젝트 벡터 DB 구축 (초기 시드 데이터)
-- [ ] 유사도 분석 API 구현 (`POST /portfolio/analyze`)
-- [ ] 차별화 제안 프롬프트 작성 (소크라테스식 vs 직접 제안 선택 가능)
+- [x] `portfolio_projects` 테이블 임베딩 컬럼 추가 (pgvector)
+- [x] 수료생 기존 프로젝트 벡터 DB 구축 (초기 시드 데이터)
+- [x] 유사도 분석 API 구현 (`POST /portfolio/analyze`)
+- [x] 차별화 제안 프롬프트 작성 (소크라테스식 vs 직접 제안 선택 가능)
 
 ---
 
