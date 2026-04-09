@@ -40,6 +40,7 @@ import { ConnectorRegistry } from '../mcp/registry.js';
 import { withAuditLog, logAgentChange } from '../mcp/audit.js';
 import { invalidatePricingCache } from '../services/budget-guard.js';
 import { getEwsThresholds, setEwsThresholds } from '../services/ews-thresholds.js';
+import { getPortfolioSettings, setPortfolioSettings } from '../services/portfolio-settings-store.js';
 import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
@@ -1730,6 +1731,38 @@ router.delete('/budget/pricing/:id', async (req, res) => {
 
   invalidatePricingCache();
   res.status(200).json({ deleted: id });
+});
+
+// ── 포트폴리오 설정 (공유 in-memory 스토어, 기관별) ────────────────────────────
+// portfolio-settings-store.ts 에서 getPortfolioSettings / setPortfolioSettings 사용
+// Phase 5에서 portfolio_settings DB 테이블로 영속화 예정
+const portfolioSettingsSchema = z.object({
+  criticalThreshold: z.number().int().min(50).max(100),
+  warningThreshold: z.number().int().min(30).max(99),
+  defaultFeedbackStyle: z.enum(['direct', 'socratic']),
+  compareScope: z.enum(['current_cohort', 'all']),
+});
+
+// GET /admin/portfolio-settings — 현재 설정 조회
+router.get('/portfolio-settings', requireRole('admin'), (req, res) => {
+  const institutionId = (req as { user?: { institutionId?: string } }).user?.institutionId ?? 'default';
+  res.status(200).json(getPortfolioSettings(institutionId));
+});
+
+// PUT /admin/portfolio-settings — 설정 저장 (즉시 반영)
+router.put('/portfolio-settings', requireRole('admin'), (req, res) => {
+  const parsed = portfolioSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  if (parsed.data.warningThreshold >= parsed.data.criticalThreshold) {
+    res.status(400).json({ error: '주의 임계값은 위험 임계값보다 낮아야 합니다.' });
+    return;
+  }
+  const institutionId = (req as { user?: { institutionId?: string } }).user?.institutionId ?? 'default';
+  setPortfolioSettings(institutionId, parsed.data);
+  res.status(200).json(parsed.data);
 });
 
 export default router;

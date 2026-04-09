@@ -34,6 +34,7 @@ import {
   deletePersona,
 } from '../services/persona-service.js';
 import { analyzePortfolioSimilarity } from '../services/portfolio-similarity.js';
+import { getPortfolioSettings } from '../services/portfolio-settings-store.js';
 
 const router: ReturnType<typeof Router> = Router();
 
@@ -437,14 +438,16 @@ router.post('/analyze', async (req, res) => {
   }
 
   const { institutionId } = req.user!;
+  const adminSettings = getPortfolioSettings(institutionId);
+
   const {
     projectId,
     proposalText,
-    feedbackStyle,
-    compareScope,
+    feedbackStyle = adminSettings.defaultFeedbackStyle,
+    compareScope  = adminSettings.compareScope,
     courseId,
-    thresholdCritical,
-    thresholdWarning,
+    thresholdCritical = adminSettings.criticalThreshold / 100,
+    thresholdWarning  = adminSettings.warningThreshold  / 100,
   } = parsed.data;
 
   if (compareScope === 'current_cohort' && !courseId) {
@@ -461,8 +464,8 @@ router.post('/analyze', async (req, res) => {
       compareScope,
       courseId,
       institutionId,
-      ...(thresholdCritical !== undefined && { thresholdCritical }),
-      ...(thresholdWarning  !== undefined && { thresholdWarning  }),
+      thresholdCritical,
+      thresholdWarning,
     });
 
     return res.status(200).json(result);
