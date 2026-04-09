@@ -599,10 +599,10 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 ### 5-2. 멀티 테넌시 (Multi-Tenancy) 지원
 
 **작업 항목**:
-- [ ] `institutions` 테이블 기반 테넌트별 데이터 완전 분리 확인
-- [ ] Row-Level Security (RLS) PostgreSQL 정책 적용
-- [ ] 테넌트별 독립 예산·에이전트·스킬 파일 관리 확인
-- [ ] 슈퍼관리자(Super Admin) 역할 추가 (여러 교육기관 통합 관리)
+- [x] `institutions` 테이블 기반 테넌트별 데이터 완전 분리 확인
+- [x] Row-Level Security (RLS) PostgreSQL 정책 적용
+- [x] 테넌트별 독립 예산·에이전트·스킬 파일 관리 확인
+- [x] 슈퍼관리자(Super Admin) 역할 추가 (여러 교육기관 통합 관리)
 
 ---
 
@@ -1035,3 +1035,60 @@ interface RagProgressEvent {
 ```
 
 **테스트 현황**: 161개 전체 통과 / tsc 오류 0개 (신규 파일 기준)
+
+---
+
+## 부록 M. Phase 5-2 멀티 테넌시 구현 이력 (2026-04-09)
+
+### M-1. `super_admin` 역할 추가 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **변경** | `USER_ROLES`에 `'super_admin'` 추가, `JwtPayload.institutionId = 'super'` 고정값 약속 |
+| **인증** | `/auth/login` Zod `refine`: `super_admin` 역할이면 `institutionId='super'` 강제, 그 외 역할은 UUID 검증 |
+| **RBAC** | `requireRole()` — 기존 방식 그대로 / `requireSameInstitution()` — `super_admin`도 전 기관 접근 허용 |
+| **JWT** | `institutionId: 'super'`를 담은 토큰 발급 → RLS 정책의 `'super'` 분기로 자동 우회 |
+
+---
+
+### M-2. PostgreSQL Row-Level Security (RLS) ✅
+
+| 항목 | 내용 |
+|---|---|
+| **마이그레이션** | `packages/db/drizzle/0009_rls_tenant_isolation.sql` |
+| **적용 테이블** | `students`, `courses`, `agents`, `instructor_skills`, `budget_policies`, `rag_documents`, `ews_risk_scores`, `ews_settings`, `institution_settings`, `routines`, `goals`, `portfolio_projects`, `heartbeat_runs`, `persona_templates`, `audit_logs`, `institutions` (16개) |
+| **정책 공식** | `current_setting('app.institution_id', true) = 'super'` OR `institution_id = …::uuid` |
+| **특수 케이스** | `persona_templates`: `institution_id IS NULL`이면 전역 기본 템플릿 (모든 기관 공유) |
+| **`institutions` 테이블** | `super_admin`만 전체 목록 조회 / 일반 `admin`은 자신의 기관만 조회 가능 |
+
+---
+
+### M-3. `withTenantContext` RLS 헬퍼 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **파일** | `packages/db/src/rls.ts` (신규), `packages/db/src/index.ts` (export 추가) |
+| **핵심 패턴** | `db.transaction(tx => { SET LOCAL app.institution_id = ? → callback(tx) })` |
+| **커넥션 풀 안전** | `SET LOCAL`은 현재 트랜잭션 범위에서만 유효 → 트랜잭션 종료 시 자동 초기화, 크로스 테넌트 오염 방지 |
+| **Super Admin** | `institutionId='super'` 전달 시 RLS 정책의 `'super'` 분기 활성화 → 전 기관 데이터 접근 |
+| **`setTenantSession`** | 단일 SELECT 경량 헬퍼 (세션 레벨, 폴백용) |
+
+---
+
+### M-4. Super Admin 통합 관리 API ✅
+
+| 엔드포인트 | 설명 |
+|---|---|
+| `GET /super-admin/institutions` | 전체 기관 목록 (active + inactive) |
+| `POST /super-admin/institutions` | 신규 기관 등록 (slug 중복 검사 포함) |
+| `GET /super-admin/institutions/:id` | 특정 기관 상세 |
+| `PUT /super-admin/institutions/:id` | 기관 정보 수정 |
+| `PATCH /super-admin/institutions/:id/deactivate` | 기관 비활성화 (데이터 보존) |
+| `GET /super-admin/stats` | 플랫폼 전체 통계 (기관수·수강생수·월 AI 비용·고위험 수강생·RAG 문서수) |
+| `GET /super-admin/institutions/:id/stats` | 특정 기관 세부 현황 |
+
+**보안**: `authenticate + requireRole('super_admin')` 이중 보호, `adminLimiter` 속도 제한
+
+---
+
+**테스트 현황**: 185개 전체 통과 (Phase 5-2 신규 24개 포함)

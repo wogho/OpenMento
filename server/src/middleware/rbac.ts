@@ -56,8 +56,8 @@ export function requireSameInstitution(
 
   const { role, institutionId } = req.user;
 
-  // admin은 전 기관 접근 허용
-  if (role === 'admin') {
+  // admin, super_admin은 전 기관 접근 허용
+  if (role === 'admin' || role === 'super_admin') {
     next();
     return;
   }

@@ -1,13 +1,14 @@
 // ── 역할 정의 ──────────────────────────────────────────────
 // plan.md 부록 B: RBAC 접근 제어 /student/* /instructor/* /admin/*
-export const USER_ROLES = ['student', 'instructor', 'admin'] as const;
+// Phase 5-2: super_admin 추가 — 여러 교육기관 통합 관리
+export const USER_ROLES = ['student', 'instructor', 'admin', 'super_admin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 // ── JWT 페이로드 ────────────────────────────────────────────
 export interface JwtPayload {
-  sub: string;       // userId (UUID)
+  sub: string;           // userId (UUID)
   role: UserRole;
-  institutionId: string; // 멀티 테넌트: 기관 격리
+  institutionId: string; // 멀티 테넌트: 기관 격리 (super_admin은 'super' 고정값 사용)
   iat?: number;
   exp?: number;
 }

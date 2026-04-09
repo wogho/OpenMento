@@ -8,6 +8,7 @@ import instructorRouter from './routes/instructor.js';
 import adminRouter from './routes/admin.js';
 import webhookRouter from './routes/webhook.js';
 import portfolioRouter from './routes/portfolio.js';
+import superAdminRouter from './routes/super-admin.js';
 import { createBullBoardRouter, BULL_BOARD_BASE_PATH } from './routes/bull-board.js';
 import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
@@ -53,6 +54,8 @@ app.use('/student', chatLimiter, studentRouter);
 app.use('/instructor', adminLimiter, instructorRouter);
 app.use('/admin', adminLimiter, adminRouter);
 app.use('/portfolio', chatLimiter, portfolioRouter);
+// Phase 5-2: Super Admin — 전체 교육기관 통합 관리 (super_admin 역할 전용)
+app.use('/super-admin', adminLimiter, superAdminRouter);
 
 // ── BullMQ 큐 모니터링 대시보드 (Phase 5-1 개선 ①: DLQ + Admin UI) ──────────
 // admin 역할 전용, REDIS_URL 있을 때만 활성화됩니다.
