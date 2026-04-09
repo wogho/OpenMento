@@ -468,13 +468,13 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 ### 3-4. 강사 대시보드 UI — 스킬 관리 (Phase 3 범위)
 
 **작업 항목**:
-- [ ] 스킬 파일 관리 페이지 구현
+- [x] 스킬 파일 관리 페이지 구현
   - 스킬 목록 CRUD
   - Split-pane 마크다운 에디터 (`@uiw/react-md-editor`)
   - 서식 툴바 (굵게 / 기울임 / 목록 / 코드블록 / 표 삽입)
   - "저장하고 AI 강사에 즉시 반영" 버튼
   - 버전 이력 표시 (언제 누가 수정했는지)
-- [ ] 에이전트 등록·설정 폼 구현
+- [x] 에이전트 등록·설정 폼 구현
   - 이름 / 역할 선택 / 모델 선택 (추천 표시 포함) / 월 예산 / 적용 스킬 / 백업 모델
   - JSON 입력 필드 없음, 전부 드롭다운·토글·숫자 입력
 
@@ -482,10 +482,10 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 
 ### Phase 3 완료 기준 (Definition of Done)
 
-- [ ] 강사가 GUI에서 스킬 파일 작성 → 저장 즉시 AI 강사 응답에 컨벤션 반영 확인
-- [ ] Java반 → Python반 전환 시 스킬 파일 교체만으로 AI 전문성 전환 확인
-- [ ] LLM API 장애 시 백업 벤더로 자동 전환 동작 확인
-- [ ] 에이전트 등록을 GUI에서 JSON 없이 완료 가능
+- [x] 강사가 GUI에서 스킬 파일 작성 → 저장 즉시 AI 강사 응답에 컨벤션 반영 확인
+- [x] Java반 → Python반 전환 시 스킬 파일 교체만으로 AI 전문성 전환 확인
+- [x] LLM API 장애 시 백업 벤더로 자동 전환 동작 확인
+- [x] 에이전트 등록을 GUI에서 JSON 없이 완료 가능
 
 ---
 
@@ -651,17 +651,18 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 
 | GUI 기능 | 대응 API | 구현 Phase | 상태 |
 |---|---|---|---|
-| 에이전트 등록·설정 폼 | `POST/PUT /admin/agents` | Phase 3 | - |
-| 시각적 스케줄 설정기 | `PUT /admin/routines` | Phase 2 | - |
-| 스킬 파일 마크다운 에디터 | `PUT /admin/skills` | Phase 3 | - |
-| MCP 외부 시스템 연동 폼 | `POST /admin/connectors` | Phase 1 | - |
-| EWS 임계치 슬라이더 | `PUT /admin/thresholds` | Phase 2 | - |
-| 예산 숫자 입력 + 게이지 | `PUT /admin/budget` | Phase 2 | - |
+| 에이전트 등록·설정 폼 | `POST/PUT /admin/agents` | Phase 3 | 완료 |
+| 시각적 스케줄 설정기 | `PUT /admin/routines` | Phase 2 | 완료 |
+| 스킬 파일 마크다운 에디터 | `PUT /admin/skills` | Phase 3 | 완료 |
+| MCP 외부 시스템 연동 폼 | `POST /admin/connectors` | Phase 1 | 완료 |
+| EWS 임계치 슬라이더 | `PUT /admin/thresholds` | Phase 2 | 완료 |
+| 예산 숫자 입력 + 게이지 | `PUT /admin/budget` | Phase 2 | 완료 |
 | 포트폴리오 유사도 슬라이더 | `PUT /admin/portfolio-settings` | Phase 4 | 완료 |
-| API 키 마스킹 보안 키 관리 | `PUT /admin/secrets` | Phase 1 | - |
-| 사용자 초대·엑셀 업로드 | `POST /admin/users/invite` | Phase 2 | - |
-| 교재 드래그앤드롭 업로드 | `POST /admin/documents` | Phase 1 | - |
-| LLM 모델 드롭다운 선택 | `PUT /admin/agents/:id` | Phase 3 | - |
+| API 키 마스킹 보안 키 관리 | `PUT /admin/secrets` | Phase 1 | 완료 |
+| 사용자 초대·엑셀 업로드 | `POST /admin/users/invite` | Phase 2 | 완료 |
+| 교재 드래그앤드롭 업로드 | `POST /admin/documents` | Phase 1 | 완료 |
+| LLM 모델 드롭다운 선택 | `PUT /admin/agents/:id` | Phase 3 | 완료 |
+| 큐 모니터링 대시보드 | `GET /admin/queues` | Phase 5 | 완료 |
 | 서비스 재시작 버튼 | `POST /admin/system/restart` | Phase 5 | - |
 
 ---
