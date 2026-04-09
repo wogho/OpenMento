@@ -41,6 +41,7 @@ import { withAuditLog, logAgentChange } from '../mcp/audit.js';
 import { invalidatePricingCache } from '../services/budget-guard.js';
 import { getEwsThresholds, setEwsThresholds } from '../services/ews-thresholds.js';
 import { getPortfolioSettings, setPortfolioSettings } from '../services/portfolio-settings-store.js';
+import { getInstitutionSetting, setInstitutionSetting } from '../services/institution-settings-service.js';
 import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
@@ -51,10 +52,22 @@ const router: ReturnType<typeof Router> = Router();
 router.use(authenticate);
 router.use(requireRole('admin'));
 
-// ─── 보안 키 인메모리 저장소 (Phase 1) ────────────────────────────────────────
+// ─── 보안 키 저장소 (DB Write-Through 캐시) ────────────────────────────────────
+// institution-settings-service를 통해 institution_settings 테이블에 영속화
 // process.env 업데이트를 통해 LLM 어댑터가 즉시 새 키를 사용할 수 있도록 함
-// Phase 2 이후 DB 암호화 저장으로 전환 예정
-const secretsStore = new Map<string, string>();
+// ⚠️ Phase 5-5: settingValue(secrets) 컬럼 레벨 pgcrypto 암호화 예정
+const SECRETS_KEY = 'secrets';
+interface AdminSecrets {
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  slackWebhookUrl?: string;
+}
+async function getSecrets(institutionId: string): Promise<AdminSecrets> {
+  return getInstitutionSetting<AdminSecrets>(institutionId, SECRETS_KEY, {});
+}
+async function setSecrets(institutionId: string, secrets: AdminSecrets): Promise<void> {
+  return setInstitutionSetting<AdminSecrets>(institutionId, SECRETS_KEY, secrets);
+}
 
 // multer: OS tmpdir 디스크 스토리지 — worker_threads 기반 ingestDocument()가 파일 경로를 요구함
 // (memoryStorage()는 req.file.path = undefined → pipeline에서 ENOENT 발생)
@@ -190,25 +203,27 @@ router.delete('/documents/:id', async (req, res) => {
 });
 
 // GET /admin/secrets — 마스킹된 현재 보안 키 반환
-router.get('/secrets', (_req, res) => {
+router.get('/secrets', async (req, res) => {
+  const institutionId = req.user?.institutionId ?? 'default';
+  const secrets = await getSecrets(institutionId);
   const mask = (v: string | undefined) =>
     v ? `${'•'.repeat(Math.max(0, v.length - 4))}${v.slice(-4)}` : '';
 
   res.json({
-    openaiApiKey: mask(secretsStore.get('openaiApiKey')),
-    anthropicApiKey: mask(secretsStore.get('anthropicApiKey')),
-    slackWebhookUrl: secretsStore.get('slackWebhookUrl') ?? '',
+    openaiApiKey: mask(secrets.openaiApiKey),
+    anthropicApiKey: mask(secrets.anthropicApiKey),
+    slackWebhookUrl: secrets.slackWebhookUrl ?? '',
   });
 });
 
-// PUT /admin/secrets — 보안 키 저장 (인메모리 + process.env 즉시 반영)
+// PUT /admin/secrets — 보안 키 저장 (DB Write-Through + process.env 즉시 반영)
 const secretsSchema = z.object({
   openaiApiKey: z.string().optional(),
   anthropicApiKey: z.string().optional(),
   slackWebhookUrl: z.union([z.string().url(), z.literal('')]).optional(),
 });
 
-router.put('/secrets', (req, res) => {
+router.put('/secrets', async (req, res) => {
   const parsed = secretsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -218,21 +233,26 @@ router.put('/secrets', (req, res) => {
     return;
   }
 
+  const institutionId = req.user?.institutionId ?? 'default';
   const { openaiApiKey, anthropicApiKey, slackWebhookUrl } = parsed.data;
 
+  const existing = await getSecrets(institutionId);
+  const updated: AdminSecrets = { ...existing };
+
   if (openaiApiKey) {
-    secretsStore.set('openaiApiKey', openaiApiKey);
+    updated.openaiApiKey = openaiApiKey;
     process.env.OPENAI_API_KEY = openaiApiKey;
   }
   if (anthropicApiKey) {
-    secretsStore.set('anthropicApiKey', anthropicApiKey);
+    updated.anthropicApiKey = anthropicApiKey;
     process.env.ANTHROPIC_API_KEY = anthropicApiKey;
   }
   if (slackWebhookUrl !== undefined) {
-    secretsStore.set('slackWebhookUrl', slackWebhookUrl);
+    updated.slackWebhookUrl = slackWebhookUrl;
     process.env.SLACK_WEBHOOK_URL = slackWebhookUrl;
   }
 
+  await setSecrets(institutionId, updated);
   res.json({ message: '보안 키가 저장되었습니다.' });
 });
 
@@ -1733,9 +1753,7 @@ router.delete('/budget/pricing/:id', async (req, res) => {
   res.status(200).json({ deleted: id });
 });
 
-// ── 포트폴리오 설정 (공유 in-memory 스토어, 기관별) ────────────────────────────
-// portfolio-settings-store.ts 에서 getPortfolioSettings / setPortfolioSettings 사용
-// Phase 5에서 portfolio_settings DB 테이블로 영속화 예정
+// ── 포트폴리오 설정 (DB Write-Through 캐시, 기관별) ─────────────────────────
 const portfolioSettingsSchema = z.object({
   criticalThreshold: z.number().int().min(50).max(100),
   warningThreshold: z.number().int().min(30).max(99),
@@ -1744,13 +1762,14 @@ const portfolioSettingsSchema = z.object({
 });
 
 // GET /admin/portfolio-settings — 현재 설정 조회
-router.get('/portfolio-settings', requireRole('admin'), (req, res) => {
+router.get('/portfolio-settings', requireRole('admin'), async (req, res) => {
   const institutionId = (req as { user?: { institutionId?: string } }).user?.institutionId ?? 'default';
-  res.status(200).json(getPortfolioSettings(institutionId));
+  const settings = await getPortfolioSettings(institutionId);
+  res.status(200).json(settings);
 });
 
-// PUT /admin/portfolio-settings — 설정 저장 (즉시 반영)
-router.put('/portfolio-settings', requireRole('admin'), (req, res) => {
+// PUT /admin/portfolio-settings — 설정 저장 (DB 즉시 반영)
+router.put('/portfolio-settings', requireRole('admin'), async (req, res) => {
   const parsed = portfolioSettingsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -1761,7 +1780,7 @@ router.put('/portfolio-settings', requireRole('admin'), (req, res) => {
     return;
   }
   const institutionId = (req as { user?: { institutionId?: string } }).user?.institutionId ?? 'default';
-  setPortfolioSettings(institutionId, parsed.data);
+  await setPortfolioSettings(institutionId, parsed.data);
   res.status(200).json(parsed.data);
 });
 

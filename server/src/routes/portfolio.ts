@@ -438,7 +438,7 @@ router.post('/analyze', async (req, res) => {
   }
 
   const { institutionId } = req.user!;
-  const adminSettings = getPortfolioSettings(institutionId);
+  const adminSettings = await getPortfolioSettings(institutionId);
 
   const {
     projectId,

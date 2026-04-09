@@ -893,3 +893,38 @@ github api
   - `portfolio-settings-store.ts` 공유 모듈 신설하여 기관별 in-memory 설정 스토어 분리.
   - `portfolio.ts` 내 `/analyze` 엔드포인트에서 `getPortfolioSettings()`를 통해 분석 실행 시점의 최신 임계치(`criticalThreshold`, `warningThreshold`), 피드백 스타일, 비교 범위를 동적으로 읽어오도록 수정.
   - 관리자 슬라이더 조작 즉시 다음 분석 요청부터 변경 사항이 완벽히 반영됨.
+
+### J. 설정 저장소 DB 영속화 (Gemini 제언 반영) ✅
+
+**배경**: Phase 4 완료 후 Gemini 코드 리뷰에서 두 가지 지적:
+1. `portfolio-settings-store.ts`의 in-memory Map — 서버 재시작 시 슬라이더 설정 초기화
+2. `admin.ts`의 `secretsStore` in-memory Map — 서버 재시작 시 API 키 소멸, 재입력 필요
+
+**해결**:
+
+#### J-1. `institution_settings` 테이블 신설
+- `packages/db/src/schema/institution_settings.ts` 생성
+- `(institutionId UUID FK, settingKey text)` UNIQUE 복합키, `settingValue jsonb`
+- `settingKey = 'portfolio'` → `PortfolioSettings` JSON
+- `settingKey = 'secrets'` → `{ openaiApiKey?, anthropicApiKey?, slackWebhookUrl? }` JSON
+- ⚠️ Phase 5-5: secrets 컬럼 레벨 pgcrypto 암호화 예정
+
+#### J-2. `institution-settings-service.ts` Write-Through 캐시 서비스 신설
+- `ews-thresholds.ts`와 동일한 패턴: in-memory Map + DB UPSERT + 서버 기동 프리워밍
+- `initInstitutionSettingsDb(db)`, `getInstitutionSetting<T>()`, `setInstitutionSetting<T>()`, `loadAllInstitutionSettings()`
+- DB 불가 시 기본값 폴백으로 서버 기동 보장
+
+#### J-3. `portfolio-settings-store.ts` async DB 영속화
+- `getPortfolioSettings()` / `setPortfolioSettings()` → `Promise<T>` 반환
+- 내부에서 `getInstitutionSetting` / `setInstitutionSetting` 위임
+
+#### J-4. `admin.ts` secretsStore → DB 영속화
+- `const secretsStore = new Map<string, string>()` 제거
+- GET `/admin/secrets`: `getSecrets(institutionId)` async 조회
+- PUT `/admin/secrets`: `getSecrets` → 병합 → `setSecrets` UPSERT + `process.env` 즉시 반영
+
+#### J-5. `server/src/index.ts` 프리워밍 + 재시작 시 secrets 복원
+- 서버 기동 시 `initInstitutionSettingsDb` + `loadAllInstitutionSettings()` 호출
+- DB에 저장된 secrets를 `process.env`에 재적용 (서버 재시작 후 LLM 어댑터 즉시 사용 가능)
+
+**테스트 현황**: 161개 전체 통과 / tsc 오류 0개 (대상 파일 기준)

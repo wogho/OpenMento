@@ -12,6 +12,7 @@ export * from './rag_documents.js';
 export * from './portfolio_projects.js';
 export * from './portfolio_similarity_logs.js';
 export * from './persona_templates.js';
+export * from './institution_settings.js';
 export * from './audit_logs.js';
 export * from './conversation_messages.js';
 

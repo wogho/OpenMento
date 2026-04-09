@@ -12,6 +12,7 @@ import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
 import { startWebhookWorker, closeWebhookWorker } from './queues/webhook.worker.js';
 import { initEwsThresholdsDb, loadEwsThresholdsFromDb } from './services/ews-thresholds.js';
+import { initInstitutionSettingsDb, loadAllInstitutionSettings, getInstitutionSetting } from './services/institution-settings-service.js';
 import { closeWebhookQueue } from './queues/webhook.queue.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
@@ -93,6 +94,15 @@ httpServer.listen(PORT, () => {
     initEwsThresholdsDb(db);
     await loadEwsThresholdsFromDb();
     logger.info('[ews-thresholds] DB 프리워밍 완료');
+    // ── institution_settings 프리워밍 + 서버 재시작 시 secrets 복원 ─
+    initInstitutionSettingsDb(db);
+    await loadAllInstitutionSettings();
+    logger.info('[institution-settings] DB 프리워밍 완료');
+    // DB에 저장된 API 키를 process.env에 복원 (기본 기관 기준)
+    const defaultSecrets = await getInstitutionSetting<Record<string, string>>('default', 'secrets', {});
+    if (defaultSecrets['openaiApiKey']) process.env.OPENAI_API_KEY = defaultSecrets['openaiApiKey'];
+    if (defaultSecrets['anthropicApiKey']) process.env.ANTHROPIC_API_KEY = defaultSecrets['anthropicApiKey'];
+    if (defaultSecrets['slackWebhookUrl']) process.env.SLACK_WEBHOOK_URL = defaultSecrets['slackWebhookUrl'];
   })();
   // ── Heartbeat 스케줄러 기동 (Phase 2-1) ─────────────────────
   startHeartbeatScheduler();
