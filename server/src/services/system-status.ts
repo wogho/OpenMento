@@ -106,7 +106,9 @@ async function checkRedisHealth(): Promise<ServiceInfo> {
     (async () => {
       try {
         // ioredis 동적 import — 런타임에 bullmq 의존성 활용
-        const { default: Redis } = await import('ioredis');
+        const { default: RedisClass } = await import('ioredis');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const Redis = RedisClass as any;
         const url = new URL(redisUrl);
         const client = new Redis({
           host: url.hostname,

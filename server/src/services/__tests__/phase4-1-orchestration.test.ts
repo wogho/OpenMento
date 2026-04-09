@@ -196,7 +196,7 @@ describe('[Orc] startPortfolioWorkflow — 워크플로우 생성', () => {
           return Promise.resolve([{ id: goalId }]);
         }),
       }),
-    }) as ReturnType<typeof db.insert>);
+    }) as unknown as ReturnType<typeof db.insert>);
 
     vi.mocked(db.update).mockReturnValue({
       set: vi.fn().mockReturnValue({

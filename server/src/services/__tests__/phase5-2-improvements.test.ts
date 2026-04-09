@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { assertTenantExists, warnIfRlsEmpty, rlsErrorHandler, RlsNotFoundError } from '../../utils/tenant-assert.js';
 
 // ───────────────────────── 경로 헬퍼 ──────────────────────────────────────────
 const ROOT = path.resolve(__dirname, '../../../..');
@@ -264,7 +265,6 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
   });
 
   it('리소스가 있으면 조용히 통과해야 한다', async () => {
-    const { assertTenantExists } = await import('../../utils/tenant-assert.js');
     const resource = { id: 'abc', name: 'Course A' };
     expect(() =>
       assertTenantExists(resource, {
@@ -276,9 +276,6 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
   });
 
   it('리소스가 null 이면 RlsNotFoundError를 throw해야 한다', async () => {
-    const { assertTenantExists, RlsNotFoundError } = await import(
-      '../../utils/tenant-assert.js'
-    );
     expect(() =>
       assertTenantExists(null, {
         resourceType: 'student',
@@ -289,9 +286,6 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
   });
 
   it('throw 된 RlsNotFoundError의 statusCode는 404여야 한다', async () => {
-    const { assertTenantExists, RlsNotFoundError } = await import(
-      '../../utils/tenant-assert.js'
-    );
     let caught: RlsNotFoundError | null = null;
     try {
       assertTenantExists(undefined, {
@@ -309,7 +303,6 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
   });
 
   it('warn 로그에 RLS_NOT_FOUND 이벤트가 기록되어야 한다', async () => {
-    const { assertTenantExists } = await import('../../utils/tenant-assert.js');
     try {
       assertTenantExists(null, {
         resourceType: 'course',
@@ -327,7 +320,6 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
   });
 
   it('req 컨텍스트가 있으면 method/path가 로그에 포함되어야 한다', async () => {
-    const { assertTenantExists } = await import('../../utils/tenant-assert.js');
     const mockReq = { method: 'GET', path: '/courses/c-999', ip: '127.0.0.1', headers: {} } as never;
     try {
       assertTenantExists(null, {
@@ -345,9 +337,6 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
   });
 
   it('클라이언트가 받는 에러 메시지에는 RLS/기관 정보가 없어야 한다', async () => {
-    const { assertTenantExists, RlsNotFoundError } = await import(
-      '../../utils/tenant-assert.js'
-    );
     let err: RlsNotFoundError | null = null;
     try {
       assertTenantExists(null, {
@@ -380,7 +369,6 @@ describe('③ warnIfRlsEmpty — 빈 목록 RLS 로깅', () => {
   });
 
   it('결과가 있으면 로그를 남기지 않아야 한다', async () => {
-    const { warnIfRlsEmpty } = await import('../../utils/tenant-assert.js');
     warnIfRlsEmpty(
       [{ id: 'a' }, { id: 'b' }],
       { resourceType: 'student', institutionId: 'inst-001', collectionName: 'students' },
@@ -389,7 +377,6 @@ describe('③ warnIfRlsEmpty — 빈 목록 RLS 로깅', () => {
   });
 
   it('결과가 비어있으면 RLS_EMPTY_RESULT 로그를 남겨야 한다', async () => {
-    const { warnIfRlsEmpty } = await import('../../utils/tenant-assert.js');
     warnIfRlsEmpty(
       [],
       { resourceType: 'student', institutionId: 'inst-001', collectionName: 'students' },
@@ -408,9 +395,6 @@ describe('③ warnIfRlsEmpty — 빈 목록 RLS 로깅', () => {
 
 describe('③ rlsErrorHandler — Express 통합', () => {
   it('RlsNotFoundError를 404 JSON으로 변환해야 한다', async () => {
-    const { rlsErrorHandler, RlsNotFoundError } = await import(
-      '../../utils/tenant-assert.js'
-    );
     const err = new RlsNotFoundError({
       message: 'course not found',
       resourceType: 'course',
@@ -431,7 +415,6 @@ describe('③ rlsErrorHandler — Express 통합', () => {
   });
 
   it('다른 에러는 next()로 위임해야 한다', async () => {
-    const { rlsErrorHandler } = await import('../../utils/tenant-assert.js');
     const err = new Error('other error');
     const next = vi.fn();
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };

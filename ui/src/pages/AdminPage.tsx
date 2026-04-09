@@ -13,7 +13,7 @@
  */
 
 import { useState, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import DocumentManager from './admin/DocumentManager';
 import SecretsManager from './admin/SecretsManager';
@@ -49,7 +49,16 @@ type AdminTab =
 export default function AdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<AdminTab>('principal');
+  const location = useLocation();
+
+  // URL 경로에서 탭 ID 파싱: /admin/thresholds → 'thresholds'
+  const pathSegment = location.pathname.replace(/^\/admin\/?/, '').split('/')[0] as AdminTab;
+  const validTabs: AdminTab[] = [
+    'principal','instructor','documents','ews','skills','agents',
+    'schedule','thresholds','notifications','budget','secrets','portfolio-settings','system',
+  ];
+  const initialTab: AdminTab = validTabs.includes(pathSegment) ? pathSegment : 'principal';
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
 
   const handleLogout = () => {
     logout();

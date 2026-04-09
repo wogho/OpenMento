@@ -160,11 +160,12 @@ const FAKE_LOG_ID     = '00000000-0000-0000-0000-000000000099';
 
 function setupMocks(similarityScore: number, hasComparable = true) {
   mockEmbedText.mockResolvedValue(FAKE_EMBEDDING);
-  mockExecute.mockResolvedValue({
-    rows: hasComparable
+  // postgres.js db.execute() 는 RowList (배열) 를 직접 반환
+  mockExecute.mockResolvedValue(
+    hasComparable
       ? [{ id: FAKE_COMPARE_ID, similarity: similarityScore }]
       : [],
-  });
+  );
   mockInsertReturning.mockResolvedValue([{ id: FAKE_LOG_ID }]);
   mockUpdateWhere.mockResolvedValue([]);
   mockChat.mockResolvedValue({ content: '피드백 내용입니다.' });

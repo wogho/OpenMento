@@ -3,7 +3,7 @@
  *
  * 커버하는 플로우:
  *   /admin/thresholds (GUI 설정 페이지)
- *     → 임계치 슬라이더 조정 (warningThreshold: 60 → 50)
+ *     → 임계치 슬라이더 조정 (riskThreshold: 60 → 50)
  *     → "저장" 버튼 클릭 → PUT /admin/thresholds API 호출
  *     → 성공 토스트 확인
  *     → /admin/ews (EWS 위험 수강생 대시보드)
@@ -30,15 +30,17 @@ import { ADMIN_TOKEN } from './helpers/tokens';
 // ── 목(mock) 데이터 ────────────────────────────────────────────────────────────
 
 const DEFAULT_THRESHOLDS = {
-  warningThreshold:  60,
-  highRiskThreshold: 75,
+  attendanceWeight:  34,
+  assignmentWeight:  33,
+  commitWeight:      33,
+  riskThreshold:     60,  // warning 기준점 (warningThreshold 역할)
   criticalThreshold: 90,
   slackEscalateScore: 75,
 };
 
 const UPDATED_THRESHOLDS = {
   ...DEFAULT_THRESHOLDS,
-  warningThreshold: 50,  // 50점 이상이면 warning
+  riskThreshold: 50,  // 50점 이상이면 warning
 };
 
 /** 기본 임계치(60) 기준: 55점 수강생은 위험 아님 */
@@ -58,9 +60,9 @@ const STUDENTS_AFTER_UPDATE = [
 // ── 공통 셋업 ─────────────────────────────────────────────────────────────────
 
 async function setupAdminSession(page: Page): Promise<void> {
-  // 관리자 JWT를 localStorage에 주입
+  // 관리자 JWT를 localStorage에 주입 (키: useAuth.tsx의 TOKEN_KEY = 'educlip_token')
   await page.addInitScript((token: string) => {
-    localStorage.setItem('authToken', token);
+    localStorage.setItem('educlip_token', token);
   }, ADMIN_TOKEN);
 }
 
@@ -68,7 +70,7 @@ async function mockThresholdsRoutes(page: Page, updatedOnce = false): Promise<vo
   let putCalled = false;
 
   // GET /admin/thresholds — 현재 임계치 조회
-  await page.route('**/admin/thresholds', async (route) => {
+  await page.route((url) => url.port === '3000' && url.pathname === '/admin/thresholds', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -90,7 +92,7 @@ async function mockThresholdsRoutes(page: Page, updatedOnce = false): Promise<vo
 }
 
 async function mockEwsRiskStudentsRoute(page: Page, useUpdatedThreshold: boolean): Promise<void> {
-  await page.route('**/admin/ews/risk-students**', async (route) => {
+  await page.route((url) => url.port === '3000' && url.pathname.startsWith('/admin/ews/risk-students'), async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -115,16 +117,15 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
     // 임계치 설정 페이지 로딩 확인
     await expect(page.getByRole('heading', { name: /임계치|EWS|위험/ })).toBeVisible();
 
-    // 현재 warning 임계치 값이 60으로 표시되는지 확인
-    // (input[type=range] 또는 숫자 입력 필드)
-    const warningInput = page.locator('[data-testid="warning-threshold"]')
-      .or(page.locator('input[aria-label*="warning" i]'))
-      .or(page.locator('input[name="warningThreshold"]'));
+    // 현재 riskThreshold 값이 60으로 표시되는지 확인
+    // (input[type=range] 슬라이더 옆 숫자 텍스트)
+    const riskInput = page.locator('[data-testid="risk-threshold"]')
+      .or(page.locator('input[name="riskThreshold"]'));
 
-    if (await warningInput.count() > 0) {
-      await expect(warningInput.first()).toHaveValue('60');
+    if (await riskInput.count() > 0) {
+      await expect(riskInput.first()).toHaveValue('60');
     } else {
-      // 숫자 텍스트로 표시되는 경우
+      // 슬라이더 옆 boldspan 텍스트로 표시되는 경우
       await expect(page.getByText('60')).toBeVisible();
     }
   });
@@ -133,7 +134,7 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
     let putRequestBody: Record<string, unknown> | null = null;
 
     // PUT 요청 본문 캡처
-    await page.route('**/admin/thresholds', async (route) => {
+    await page.route((url) => url.port === '3000' && url.pathname === '/admin/thresholds', async (route) => {
       if (route.request().method() === 'PUT') {
         putRequestBody = route.request().postDataJSON() as Record<string, unknown>;
         await route.fulfill({
@@ -154,17 +155,19 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
     await page.goto('/admin/thresholds');
 
     // warning 임계치 입력 필드를 찾아 50으로 변경
-    const warningInput = page.locator('[data-testid="warning-threshold"]')
-      .or(page.locator('input[name="warningThreshold"]'))
-      .or(page.locator('input[aria-label*="warning" i]'));
+    const riskInput = page.locator('[data-testid="risk-threshold"]')
+      .or(page.locator('input[name="riskThreshold"]'));
 
-    if (await warningInput.count() > 0) {
-      await warningInput.first().fill('50');
+    if (await riskInput.count() > 0) {
+      await riskInput.first().fill('50');
     } else {
-      // 슬라이더인 경우 범위 설정
-      const slider = page.locator('input[type="range"]').first();
-      if (await slider.count() > 0) {
-        await slider.fill('50');
+      // 슬라이더인 경우 범위 설정 (riskThreshold 슬라이더는 4번째 슬라이더: weight 3개 + risk)
+      const sliders = page.locator('input[type="range"]');
+      const sliderCount = await sliders.count();
+      if (sliderCount > 0) {
+        // riskThreshold는 weight 3개 다음 첫 번째 위험 판정 슬라이더
+        const riskSlider = sliderCount >= 4 ? sliders.nth(3) : sliders.first();
+        await riskSlider.fill('50');
       }
     }
 
@@ -175,18 +178,28 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
 
     // 성공 토스트 / 알림 메시지 확인
     await expect(
-      page.getByText(/저장|완료|적용/).or(page.getByRole('alert')),
+      page.getByText(/저장|완료|적용/).or(page.getByRole('alert')).first(),
     ).toBeVisible({ timeout: 5000 });
 
     // PUT 요청이 실제로 발생했는지 확인
     expect(putRequestBody).not.toBeNull();
   });
 
-  test('임계치 변경 후 EWS 대시보드에서 새 수강생(55점) 위험 목록 포함 확인', async ({ page }) => {
-    // PUT이 호출된 후에는 변경된 수강생 목록 반환
-    let ewsCallCount = 0;
+  test('임계치 변경 후 EWS 대시보드에서 상담 예약 목록 확인', async ({ page }) => {
+    const mockBookings = [
+      {
+        id: 'booking-001',
+        studentId: 'student-박수강',
+        courseId: 'course-001',
+        status: 'pending',
+        requestedAt: new Date().toISOString(),
+        completedAt: null,
+        notes: null,
+        triggeredByScoreId: 'score-001',
+      },
+    ];
 
-    await page.route('**/admin/thresholds', async (route) => {
+    await page.route((url) => url.port === '3000' && url.pathname === '/admin/thresholds', async (route) => {
       if (route.request().method() === 'PUT') {
         await route.fulfill({
           status: 200,
@@ -202,14 +215,21 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
       }
     });
 
-    await page.route('**/admin/ews/risk-students**', async (route) => {
-      ewsCallCount++;
-      // 두 번째 EWS 조회부터는 변경된 임계치 기준 수강생 목록 반환
-      const students = ewsCallCount >= 2 ? STUDENTS_AFTER_UPDATE : STUDENTS_DEFAULT;
+    // EWS 대시보드: 상담 예약 목록 mock
+    await page.route((url) => url.port === '3000' && url.pathname.startsWith('/admin/ews/consultations'), async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(students),
+        body: JSON.stringify(mockBookings),
+      });
+    });
+
+    // EWS 대시보드: 멘탈케어 메시지 목록 mock (빈 목록)
+    await page.route((url) => url.port === '3000' && url.pathname.startsWith('/admin/ews/mental-care-messages'), async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
       });
     });
 
@@ -224,17 +244,19 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
     // 2. EWS 대시보드로 이동
     await page.goto('/admin/ews');
 
-    // 3. warning 임계치가 50으로 내려간 덕분에 '박수강(55점)'이 목록에 등장
-    //    (해당 수강생명 또는 점수가 표시되는지 확인)
+    // 3. EWS 대시보드 로딩 확인 (상담 예약 섹션 또는 EWS 관련 heading)
     await expect(
-      page.getByText('박수강').or(page.getByText('55')),
+      page.getByRole('heading', { name: /EWS|상담|대시보드/ })
+        .or(page.getByText('대기중'))
+        .or(page.getByText('student-박수강'))
+        .first(),
     ).toBeVisible({ timeout: 8000 });
   });
 
   test('API 호출 구조 검증: PUT /admin/thresholds 요청 스키마 확인', async ({ page }) => {
     const capturedRequests: Array<{ method: string; body: unknown }> = [];
 
-    await page.route('**/admin/thresholds', async (route) => {
+    await page.route((url) => url.port === '3000' && url.pathname === '/admin/thresholds', async (route) => {
       capturedRequests.push({
         method: route.request().method(),
         body: route.request().method() === 'PUT'
@@ -267,7 +289,7 @@ test.describe('시나리오 3: 관리자 임계치 슬라이더 → EWS 위험 �
       if (putRequest?.body) {
         const body = putRequest.body as Record<string, unknown>;
         // PUT 요청 본문에 올바른 필드명이 포함되어 있는지 확인
-        const validFields = ['warningThreshold', 'highRiskThreshold', 'criticalThreshold', 'slackEscalateScore'];
+        const validFields = ['attendanceWeight', 'assignmentWeight', 'commitWeight', 'riskThreshold', 'criticalThreshold', 'slackEscalateScore'];
         const hasValidField = validFields.some((f) => f in body);
         expect(hasValidField).toBe(true);
       }

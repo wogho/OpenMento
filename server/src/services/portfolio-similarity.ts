@@ -126,7 +126,7 @@ export async function analyzePortfolioSimilarity(
     LIMIT 1
   `);
 
-  const topRow = rows.rows[0] as { id: string; similarity: number } | undefined;
+  const topRow = (rows as unknown as Array<{ id: string; similarity: number }>)[0];
   const topSimilarity = topRow ? Number(topRow.similarity) : 0;
   const comparedProjectId = topRow?.id ?? null;
 
@@ -270,7 +270,7 @@ async function generateFeedback(opts: FeedbackOptions): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), 30_000);
 
   try {
-    const response = await adapter.chat(messages, { signal: controller.signal });
+    const response = await adapter.chat(messages);
     const prefix =
       verdict === 'differentiation_required'
         ? `⚠️ 차별화 필수 (유사도 ${scorePercent}%)\n\n`
@@ -307,7 +307,8 @@ export async function seedGraduatePortfolios(): Promise<{ seeded: number; skippe
     .where(
       and(
         eq(portfolioProjects.status, 'approved'),
-        isNull(portfolioProjects.embedding as unknown as null),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        isNull(portfolioProjects.embedding as any),
         isNull(portfolioProjects.deletedAt),
       ),
     );

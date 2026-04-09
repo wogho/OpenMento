@@ -47,6 +47,8 @@ async function loginAs(page: Page, email: string) {
   await page.fill('#email', email);
   await page.fill('#password', 'password123');
   await page.getByRole('button', { name: '로그인' }).click();
+  // 로그인 후 URL 변경이 완료될 때까지 대기
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10_000 });
 }
 
 // ── 테스트 케이스 ─────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ test('student 역할로 /admin 접근 시 /chat 으로 리다이렉트 (AdminRou
 
 test('admin 역할로 /admin 접근 → 관리자 허브 렌더링', async ({ page }) => {
   // 교재 목록 초기화 API 목
-  await page.route('**/admin/documents', async (route) => {
+  await page.route((url) => url.port === '3000' && url.pathname === '/admin/documents', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
         status: 200,
@@ -91,7 +93,7 @@ test('admin 역할로 /admin 접근 → 관리자 허브 렌더링', async ({ pa
 test('PDF 교재 업로드 → 목록 등장 → 삭제', async ({ page }) => {
   // 목록 초기 빈 배열 반환
   await page.route(
-    (url) => url.pathname === '/admin/documents' || url.href.includes('localhost:3000/admin/documents'),
+    (url) => url.port === '3000' && url.pathname === '/admin/documents',
     async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
@@ -118,9 +120,7 @@ test('PDF 교재 업로드 → 목록 등장 → 삭제', async ({ page }) => {
 
   // 삭제 API 목
   await page.route(
-    (url) =>
-      url.pathname.startsWith('/admin/documents/') ||
-      url.href.includes(`localhost:3000/admin/documents/`),
+    (url) => url.port === '3000' && url.pathname.startsWith('/admin/documents/'),
     async (route) => {
       if (route.request().method() === 'DELETE') {
         await route.fulfill({ status: 204 });
@@ -133,6 +133,9 @@ test('PDF 교재 업로드 → 목록 등장 → 삭제', async ({ page }) => {
   await loginAs(page, 'admin@example.com');
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/admin/);
+
+  // 교재 관리 탭으로 전환
+  await page.getByText('교재 관리').first().click();
 
   // 드래그앤드롭 영역 내 숨겨진 file input 을 통해 파일 업로드
   const fileInput = page.locator('input[type="file"]').first();
@@ -151,7 +154,7 @@ test('PDF 교재 업로드 → 목록 등장 → 삭제', async ({ page }) => {
 
 test('형식 오류 파일 드롭 시 인라인 에러 메시지 표시 (onDropRejected)', async ({ page }) => {
   await page.route(
-    (url) => url.pathname === '/admin/documents' || url.href.includes('localhost:3000/admin/documents'),
+    (url) => url.port === '3000' && url.pathname === '/admin/documents',
     async (route) => {
       await route.fulfill({
         status: 200,
@@ -163,6 +166,9 @@ test('형식 오류 파일 드롭 시 인라인 에러 메시지 표시 (onDropR
 
   await loginAs(page, 'admin@example.com');
   await page.goto('/admin');
+
+  // 교재 관리 탭으로 전환
+  await page.getByText('교재 관리').first().click();
 
   // .txt 파일 → PDF 전용 검증에서 거절되어야 함
   const fileInput = page.locator('input[type="file"]').first();

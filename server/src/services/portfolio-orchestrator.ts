@@ -185,6 +185,7 @@ async function callLlm(
     await recordCostEvent({
       agentId,
       institutionId,
+      provider: adapter.provider,
       inputTokens: response.inputTokens,
       outputTokens: response.outputTokens,
       model: response.model,
@@ -940,7 +941,7 @@ async function handleSimilarityStage(
       `,
     );
 
-    const rows = result.rows as Array<{
+    const rows = Array.from(result) as Array<{
       id: string;
       cosine_sim: number | null;
     }>;

@@ -33,36 +33,78 @@
     {
       "idx": 4,
       "version": "7",
+      "when": 1775505000000,
+      "tag": "0004_consultation_bookings",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
       "when": 1775505710511,
       "tag": "0004_real_skreet",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 6,
       "version": "7",
       "when": 1775508692858,
       "tag": "0005_github_repo_students",
       "breakpoints": true
     },
     {
-      "idx": 6,
+      "idx": 7,
       "version": "7",
       "when": 1775572512205,
-      "tag": "0008_oval_chronomancer",
+      "tag": "0006_oval_chronomancer",
       "breakpoints": true
     },
     {
-      "idx": 7,
+      "idx": 8,
       "version": "7",
       "when": 1775678748368,
       "tag": "0007_deep_thunderbolts",
       "breakpoints": true
     },
     {
-      "idx": 8,
+      "idx": 9,
       "version": "7",
       "when": 1775715245330,
       "tag": "0008_persona_templates_and_portfolio_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775767183205,
+      "tag": "0009_rls_tenant_isolation",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775800000000,
+      "tag": "0010_rls_composite_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775810000000,
+      "tag": "0011_onboarding_completions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775820000000,
+      "tag": "0012_onboarding_progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775900000000,
+      "tag": "0013_agent_role_data_retention",
       "breakpoints": true
     }
   ]

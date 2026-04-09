@@ -9,3 +9,6 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- uuid-ossp: UUID 기본 키 생성
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- pgcrypto: 컬럼 레벨 암호화 (Phase 5-5 — pgp_sym_encrypt / pgp_sym_decrypt)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;

@@ -930,7 +930,7 @@ github api
 - `(institutionId UUID FK, settingKey text)` UNIQUE 복합키, `settingValue jsonb`
 - `settingKey = 'portfolio'` → `PortfolioSettings` JSON
 - `settingKey = 'secrets'` → `{ openaiApiKey?, anthropicApiKey?, slackWebhookUrl? }` JSON
-- ⚠️ Phase 5-5: secrets 컬럼 레벨 pgcrypto 암호화 예정
+- ✅ Phase 5-5 완료: `secrets-encryption.ts` pgcrypto `pgp_sym_encrypt/decrypt` 컬럼 레벨 암호화 구현
 
 #### J-2. `institution-settings-service.ts` Write-Through 캐시 서비스 신설
 - `ews-thresholds.ts`와 동일한 패턴: in-memory Map + DB UPSERT + 서버 기동 프리워밍
@@ -1405,3 +1405,45 @@ plan.md 5-3 시나리오 그대로 반영:
 ---
 
 **테스트 현황**: 393개 전체 통과 (Phase 5-4 개선 신규 35개 포함) / tsc 오류 0개 (수정 파일 기준)
+
+---
+
+## 부록 O. Phase 0-5 전체 검증 이력 (2026-04-09)
+
+> Phase 5-5 커밋 이후 전체 코드베이스 통합 검증을 수행하여 발견된 이슈를 일괄 수정하였습니다.
+
+### O-1. TypeScript 컴파일 오류 수정 (6개 파일)
+
+| 파일 | 오류 유형 | 수정 내용 |
+|---|---|---|
+| `phase4-1-orchestration.test.ts` | TS2352 타입 불일치 | `as ReturnType<...>` → `as unknown as ReturnType<...>` |
+| `phase5-2-improvements.test.ts` | TS2775 assertion 오류 | 동적 import → 정적 import 전환 |
+| `phase4-2-similarity.test.ts` | mock 반환 형태 불일치 | `{ rows: [...] }` → `[...]` (postgres.js 직접 배열 반환) |
+| `portfolio-orchestrator.ts` | 누락 필드 + 타입 오류 | `provider: adapter.provider` 추가, `result.rows` → `Array.from(result)` |
+| `portfolio-similarity.ts` | 타입 오류 3건 | `.rows[0]` 접근 수정, `signal` 파라미터 제거, `as any` 캐스팅 |
+| `system-status.ts` | TS2351 not constructable | `RedisClass as any` 패턴으로 우회 |
+
+**결과**: tsc `--noEmit` 오류 0개
+
+### O-2. 단위 테스트 전체 통과
+
+- **429/429** 통과 (Duration ≈ 3s)
+- `phase4-2-similarity.test.ts` 5개 실패 → mock 수정으로 해결
+
+### O-3. Docker / DB 수정
+
+| 항목 | 수정 내용 |
+|---|---|
+| `docker/init.sql` | `CREATE EXTENSION IF NOT EXISTS pgcrypto;` 추가 (Phase 5-5 요구사항) |
+| `packages/db/drizzle/0013_agent_role_data_retention.sql` | `ALTER TYPE "public"."agent_role" ADD VALUE IF NOT EXISTS 'data_retention';` 신규 생성 |
+| `packages/db/drizzle/meta/_journal.json` | 15개 엔트리(0000~0013) 정합성 복원 |
+
+### O-4. E2E 테스트 수정 (13/13 통과)
+
+| 파일 | 수정 내용 |
+|---|---|
+| `ui/src/pages/AdminPage.tsx` | `useLocation()` 기반 URL → 초기 탭 동기화 (`/admin/thresholds` → `thresholds` 탭) |
+| `tests/e2e/scenario-2-document-upload.spec.ts` | route mock 포트 필터 수정, `loginAs()` waitForURL 추가 |
+| `tests/e2e/scenario-3-ews-threshold.spec.ts` | localStorage 키 `'authToken'` → `'educlip_token'`, mock 데이터 필드명 수정, strict mode `.first()` 추가 |
+
+**최종 테스트 현황**: **429개 단위 테스트 + 13개 E2E 테스트 전체 통과** / tsc 오류 0개 / 5개 패키지 빌드 성공
