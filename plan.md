@@ -886,3 +886,10 @@ github api
 - `PortfolioPage.handleSendMessage`: `fetch` + `ReadableStream` + `TextDecoder` SSE 클라이언트로 전환
 
 **테스트 현황**: 161개 전체 통과 (UI TypeScript 컴파일 오류 0개)
+
+### I-4. 관리자 설정 실시간 연동 (DoD 충족) ✅
+- **문제**: 관리자가 저장한 유사도 기준 슬라이더 설정(`portfolioSettingsStore`)이 `admin.ts`의 로컬 메모리에만 격리되어 있어, 수강생이 `POST /portfolio/analyze` 호출 시 기본값만 적용됨 (DoD③ 미충족).
+- **해결**: 
+  - `portfolio-settings-store.ts` 공유 모듈 신설하여 기관별 in-memory 설정 스토어 분리.
+  - `portfolio.ts` 내 `/analyze` 엔드포인트에서 `getPortfolioSettings()`를 통해 분석 실행 시점의 최신 임계치(`criticalThreshold`, `warningThreshold`), 피드백 스타일, 비교 범위를 동적으로 읽어오도록 수정.
+  - 관리자 슬라이더 조작 즉시 다음 분석 요청부터 변경 사항이 완벽히 반영됨.
