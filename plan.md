@@ -617,9 +617,9 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 ```
 
 **작업 항목**:
-- [ ] `react-joyride` 또는 `driver.js` 기반 투어 UI 구현
-- [ ] 역할별 온보딩 시나리오 작성 (원장 / 강사 / 수강생)
-- [ ] 온보딩 완료 여부 DB 저장 (완료 후 재표시 안 함)
+- [x] `react-joyride` 또는 `driver.js` 기반 투어 UI 구현
+- [x] 역할별 온보딩 시나리오 작성 (원장 / 강사 / 수강생)
+- [x] 온보딩 완료 여부 DB 저장 (완료 후 재표시 안 함)
 
 ---
 
@@ -1173,3 +1173,61 @@ assertTenantExists(row, { resourceType, resourceId, institutionId, req })
 ---
 
 **테스트 현황**: **225개 전체 통과** (Phase 5-2 개선 신규 40개 포함) / tsc 오류 0개
+
+---
+
+## 부록 O. Phase 5-3 온보딩 가이드 구현 이력 (2026-04-09)
+
+> Phase 5-3 DoD 3가지 항목을 모두 구현하였습니다.
+
+### O-1. `driver.js` 기반 역할별 투어 UI ✅
+
+| 항목 | 내용 |
+|---|---|
+| **라이브러리** | `driver.js` v1 (MIT License, ~35KB, React 의존성 없음) |
+| **관리자/강사 투어** (`admin-tour`) | 3단계: ① 스킬 파일 탭 → ② 에이전트 설정 탭 → ③ 수강생 뷰 미리보기 버튼 |
+| **수강생 투어** (`student-tour`) | 3단계: ① 채팅 입력창 → ② 메시지 목록(교재 인용) → ③ 포트폴리오 이동 버튼 |
+| **투어 트리거** | 로그인 후 800ms 지연 → DOM 안정화 → 자동 실행 |
+| **재시작** | 화면 우하단 🧭 플로팅 버튼으로 언제든 투어 재실행 가능 |
+
+**신규 파일**:
+- `ui/src/tours/scenarios.ts` — 역할별 투어 스텝 및 팝오버 텍스트 정의
+- `ui/src/hooks/useOnboarding.ts` — 완료 상태 조회·저장 + driver.js 실행 훅
+- `ui/src/components/OnboardingTour.tsx` — App.tsx에 삽입되는 투어 컨테이너
+
+**수정 파일** (투어 타깃 `id` 속성 추가):
+- `ui/src/pages/ChatPage.tsx` — `#chat-input`, `#chat-messages`, `#portfolio-nav-btn`
+- `ui/src/pages/AdminPage.tsx` — `#admin-sidebar-{tab.id}`, `#admin-chat-preview-btn`
+- `ui/src/App.tsx` — `<OnboardingTour />` 컴포넌트 삽입
+
+---
+
+### O-2. 역할별 온보딩 시나리오 ✅
+
+| 역할 | 투어 ID | 진입 경로 | 단계 수 |
+|---|---|---|---|
+| admin / instructor | `admin-tour` | `/admin` | 3단계 |
+| student | `student-tour` | `/chat` | 3단계 |
+
+plan.md 5-3 시나리오 그대로 반영:
+- **1단계**: 스킬 파일 탭 → "예시 템플릿 자동 삽입" 안내
+- **2단계**: 에이전트 설정 → "드롭다운으로 연결" 안내
+- **3단계**: 수강생 뷰 이동 → "데모 미리보기" 안내
+
+---
+
+### O-3. 온보딩 완료 여부 DB 영속화 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **테이블** | `onboarding_completions` 신설 (마이그레이션 `0011_onboarding_completions.sql`) |
+| **제약** | `(user_id, tour_id) UNIQUE` — 동일 투어 중복 기록 방지 |
+| **멱등성** | `onConflictDoNothing()` — 서버 재시작 / 재클릭 시에도 중복 없음 |
+| **API** | `GET /onboarding/status` (완료 목록 조회) + `POST /onboarding/complete` |
+| **개발 편의** | `DELETE /onboarding/reset` — production 환경에서는 403 차단 |
+
+**신규 파일**: `packages/db/src/schema/onboarding_completions.ts`, `packages/db/drizzle/0011_onboarding_completions.sql`, `server/src/routes/onboarding.ts`
+
+---
+
+**테스트 현황**: **278개 전체 통과** (Phase 5-3 신규 53개 포함) / tsc 오류 0개

@@ -130,6 +130,17 @@ export default function ChatPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* 포트폴리오 이동 (온보딩 투어 타깃 #portfolio-nav-btn) */}
+          <button
+            id="portfolio-nav-btn"
+            onClick={() => navigate('/portfolio')}
+            title="포트폴리오 기획서 작성"
+            aria-label="포트폴리오 기획서 이동"
+            className="text-white/70 hover:text-white transition text-lg"
+          >
+            🎓
+          </button>
+
           {/* 새 대화 시작 */}
           <button
             onClick={clearSession}
@@ -160,8 +171,8 @@ export default function ChatPage() {
         <ConnectionBanner status={connectionStatus} />
       )}
 
-      {/* ── 메시지 목록 ── */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+      {/* ── 메시지 목록 (온보딩 투어 타깃 #chat-messages) ── */}
+      <main id="chat-messages" className="flex-1 overflow-hidden flex flex-col">
         {/* 빈 대화 안내 */}
         {visibleMessages.length === 0 && !isTyping ? (
           <EmptyState onExampleClick={sendMessage} />
@@ -205,8 +216,8 @@ export default function ChatPage() {
         )}
       </main>
 
-      {/* ── 입력창 ── */}
-      <footer className="shrink-0">
+      {/* ── 입력창 (온보딩 투어 타깃 #chat-input) ── */}
+      <footer id="chat-input" className="shrink-0">
         <ChatInput onSend={sendMessage} disabled={isTyping} />
       </footer>
     </div>

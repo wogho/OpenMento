@@ -84,6 +84,7 @@ export default function AdminPage() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              id={`admin-sidebar-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`
                 w-full flex items-center justify-center md:justify-start gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors
@@ -102,12 +103,13 @@ export default function AdminPage() {
         {/* 하단 사용자 정보 영역 */}
         <div className="shrink-0 p-3 md:p-4 border-t border-gray-200">
           <button
+            id="admin-chat-preview-btn"
             onClick={() => navigate('/chat')}
             className="w-full flex items-center justify-center md:justify-start gap-2 p-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition mb-2"
             title="튜터 채팅 이동"
           >
             <span>🤖</span>
-            <span className="hidden md:inline-block font-medium">수강생 뷰 이동</span>
+            <span className="hidden md:inline-block font-medium">수강생 라이동</span>
           </button>
           <button
             onClick={handleLogout}

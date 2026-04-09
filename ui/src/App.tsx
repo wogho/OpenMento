@@ -6,11 +6,14 @@ import LoginPage from './pages/LoginPage';
 import ChatPage from './pages/ChatPage';
 import AdminPage from './pages/AdminPage';
 import PortfolioPage from './pages/PortfolioPage';
+import OnboardingTour from './components/OnboardingTour';
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Phase 5-3: 역할별 온보딩 투어 (첫 로그인 시 자동 실행) */}
+        <OnboardingTour />
         <Routes>
           {/* 루트 → 채팅 페이지로 리다이렉트 */}
           <Route path="/" element={<Navigate to="/chat" replace />} />
