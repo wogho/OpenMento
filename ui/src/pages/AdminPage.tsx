@@ -26,8 +26,9 @@ import NotificationSettings from './admin/NotificationSettings';
 import BudgetManagement from './admin/BudgetManagement';
 
 // md-editor(~1MB)는 해당 탭 진입 시점에만 로드
-const SkillManager     = lazy(() => import('./admin/SkillManager'));
+const SkillManager      = lazy(() => import('./admin/SkillManager'));
 const AgentConfigurator = lazy(() => import('./admin/AgentConfigurator'));
+const PortfolioSettings = lazy(() => import('./admin/PortfolioSettings'));
 
 type AdminTab =
   | 'principal'
@@ -40,7 +41,8 @@ type AdminTab =
   | 'thresholds'
   | 'notifications'
   | 'budget'
-  | 'secrets';
+  | 'secrets'
+  | 'portfolio-settings';
 
 export default function AdminPage() {
   const { user, logout } = useAuth();
@@ -63,7 +65,8 @@ export default function AdminPage() {
     { id: 'thresholds',    label: 'EWS 임계치',      icon: '🎚️', group: '설정' },
     { id: 'notifications', label: '알림 채널',       icon: '🔔', group: '설정' },
     { id: 'budget',        label: '예산 관리',       icon: '💰', group: '설정' },
-    { id: 'secrets',       label: '보안 키 관리',    icon: '🔑', group: '설정' },
+    { id: 'secrets',            label: '보안 키 관리',       icon: '🔑', group: '설정' },
+    { id: 'portfolio-settings', label: '포트폴리오 설정',    icon: '📋', group: '설정' },
   ];
 
   return (
@@ -135,7 +138,8 @@ export default function AdminPage() {
                activeTab === 'schedule'      ? '루틴 스케줄 활성화 및 크론 표현식 관리' :
                activeTab === 'thresholds'    ? 'EWS 점수 가중치 · 위험 판정 기준 조정' :
                activeTab === 'notifications' ? 'Slack Webhook URL · 에스컬레이션 정책' :
-               activeTab === 'budget'        ? 'LLM 토큰 비용 추적 · 월 예산 한도 · Soft Alert 설정' :
+               activeTab === 'budget'              ? 'LLM 토큰 비용 추적 · 월 예산 한도 · Soft Alert 설정' :
+               activeTab === 'portfolio-settings' ? '유사도 임계값 · AI 피드백 스타일 · 비교 대상 범위 구성' :
                '외부 연동 API 암호화 센터'}
             </p>
           </header>
@@ -152,8 +156,9 @@ export default function AdminPage() {
               {activeTab === 'schedule'      && <ScheduleSettings />}
               {activeTab === 'thresholds'    && <ThresholdSettings />}
               {activeTab === 'notifications' && <NotificationSettings />}
-              {activeTab === 'budget'        && <BudgetManagement />}
-              {activeTab === 'secrets'       && <SecretsManager />}
+              {activeTab === 'budget'             && <BudgetManagement />}
+              {activeTab === 'secrets'            && <SecretsManager />}
+              {activeTab === 'portfolio-settings' && <PortfolioSettings />}
             </Suspense>
           </div>
         </div>
