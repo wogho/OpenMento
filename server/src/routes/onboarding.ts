@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/rbac.js';
 import {
   db,
   onboardingCompletions,
@@ -21,8 +22,9 @@ import { io } from '../socket/chat.handler.js';
 
 const router: ReturnType<typeof Router> = Router();
 
-// 모든 온보딩 라우트는 인증 필수
+// 모든 온보딩 라우트는 인증 필수 + 최소 역할 검사 (RBAC — Phase 5-5)
 router.use(authenticate);
+router.use(requireRole('student', 'instructor', 'admin', 'super_admin'));
 
 // 허용된 투어 ID 목록 (화이트리스트) — Gemini 제언 ③ 도메인별 투어 포함
 const VALID_TOUR_IDS = [
@@ -32,6 +34,14 @@ const VALID_TOUR_IDS = [
   'ews-tour',
 ] as const;
 type TourId = (typeof VALID_TOUR_IDS)[number];
+
+// 투어별 최소 허용 역할 (역할 기반 투어 분리 — Phase 5-5)
+const TOUR_ALLOWED_ROLES: Record<TourId, string[]> = {
+  'admin-tour':     ['admin', 'super_admin'],
+  'ews-tour':       ['instructor', 'admin', 'super_admin'],
+  'portfolio-tour': ['student', 'instructor', 'admin', 'super_admin'],
+  'student-tour':   ['student', 'instructor', 'admin', 'super_admin'],
+};
 
 const tourIdSchema = z.object({
   tourId: z.enum(VALID_TOUR_IDS),
@@ -87,8 +97,15 @@ router.patch('/progress', async (req, res) => {
     return;
   }
 
-  const { sub: userId, institutionId } = req.user!;
+  const { sub: userId, institutionId, role } = req.user!;
   const { tourId, lastStepIndex } = parsed.data;
+
+  // 투어별 역할 접근 제어 (Phase 5-5)
+  const allowedRoles = TOUR_ALLOWED_ROLES[tourId];
+  if (!allowedRoles.includes(role)) {
+    res.status(403).json({ error: `'${tourId}'는 현재 역할(${role})에서 접근할 수 없습니다.` });
+    return;
+  }
 
   try {
     await db
@@ -119,8 +136,15 @@ router.post('/complete', async (req, res) => {
     return;
   }
 
-  const { sub: userId, institutionId } = req.user!;
+  const { sub: userId, institutionId, role } = req.user!;
   const { tourId } = parsed.data;
+
+  // 투어별 역할 접근 제어 (Phase 5-5)
+  const allowedRoles = TOUR_ALLOWED_ROLES[tourId];
+  if (!allowedRoles.includes(role)) {
+    res.status(403).json({ error: `'${tourId}'는 현재 역할(${role})에서 접근할 수 없습니다.` });
+    return;
+  }
 
   try {
     await db

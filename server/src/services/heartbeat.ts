@@ -30,6 +30,7 @@ import { matchesCron, parseCron } from './cron.js';
 import { issueAgentToken } from './agent-auth-jwt.js';
 import { runEwsMonitor } from './ews-monitor.js';
 import { sendEwsEscalations } from './slack-notifier.js';
+import { runDataRetention } from './data-retention.js';
 import { logger } from '../utils/logger.js';
 import { io } from '../socket/chat.handler.js';
 
@@ -229,6 +230,44 @@ async function executeAgent(
       case 'orchestrator': {
         logs.push('[orchestrator] 하위 에이전트 워크플로우 조율 (Phase 3 구현 예정)');
         break;
+      }
+
+      case 'data_retention': {
+        logs.push('[data_retention] 5년 개인정보 파기 작업 시작');
+
+        const retentionResult = await runDataRetention();
+
+        logs.push(
+          `[data_retention] 완료 — 스캔=${retentionResult.scannedStudents} ` +
+          `처리=${retentionResult.processedStudents} ` +
+          `상담노트=${retentionResult.deletedCounselingNotes} ` +
+          `대화=${retentionResult.deletedConversationMessages} ` +
+          `과제=${retentionResult.deletedAssignmentSubmissions} ` +
+          `포트폴리오=${retentionResult.nulledPortfolioProposals} ` +
+          `오류=${retentionResult.errors.length}`,
+        );
+
+        if (retentionResult.dryRun) {
+          logs.push('[data_retention] DRY RUN 모드 — 실제 삭제 없음');
+        }
+
+        return {
+          success: retentionResult.errors.length === 0,
+          resultJson: {
+            agentId: agent.id,
+            role: agent.role,
+            scannedStudents: retentionResult.scannedStudents,
+            processedStudents: retentionResult.processedStudents,
+            deletedCounselingNotes: retentionResult.deletedCounselingNotes,
+            deletedConversationMessages: retentionResult.deletedConversationMessages,
+            deletedAssignmentSubmissions: retentionResult.deletedAssignmentSubmissions,
+            nulledPortfolioProposals: retentionResult.nulledPortfolioProposals,
+            dryRun: retentionResult.dryRun,
+            errorCount: retentionResult.errors.length,
+          },
+          usageJson: { promptTokens: 0, completionTokens: 0, totalCost: 0 },
+          stdoutExcerpt: logs.slice(-30).join('\n'),
+        };
       }
 
       default: {

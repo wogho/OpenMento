@@ -22,9 +22,13 @@ import { startRagQueueEvents, closeRagQueueEvents } from './queues/rag-queue-eve
 import { rlsErrorHandler } from './utils/tenant-assert.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
+import { securityHeaders } from './middleware/security-headers.js';
 
 const app = express();
 const httpServer = createServer(app);
+
+// ── OWASP A05 보안 헤더 (Phase 5-5) — 모든 라우트 앞에 적용 ─────────────────
+app.use(securityHeaders);
 
 app.use(express.json());
 

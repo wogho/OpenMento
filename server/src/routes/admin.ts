@@ -47,6 +47,7 @@ import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
 import systemRouter from './system.js';
+import securityRouter from './security.js';
 
 const router: ReturnType<typeof Router> = Router();
 
@@ -1822,5 +1823,10 @@ router.put('/portfolio-settings', requireRole('admin'), async (req, res) => {
 // adminRouter가 이미 authenticate + requireRole('admin') 를 적용하므로
 // /admin/system/* 전체가 admin 전용으로 보호됩니다.
 router.use('/system', systemRouter);
+
+// ── Phase 5-5: 보안 감사 리포트 하위 라우터 ──────────────────────────────────
+// /admin/security/audit-report, /admin/security/rbac-report
+// adminRouter의 authenticate + requireRole('admin') 보호를 그대로 상속합니다.
+router.use('/security', securityRouter);
 
 export default router;

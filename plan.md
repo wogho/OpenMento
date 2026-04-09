@@ -636,12 +636,29 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 ### 5-5. 보안 감사 및 컴플라이언스
 
 **작업 항목**:
-- [ ] 개인정보 익명화 처리 확인 (수강생 실명 ↔ 익명 ID 분리)
-- [ ] PostgreSQL 컬럼 레벨 암호화 적용 (민감 데이터)
-- [ ] 수료 후 5년 데이터 자동 삭제 스케줄 구현 (교육부 지침 준수)
-- [ ] RBAC 전체 엔드포인트 접근 권한 최종 검토
-- [ ] 보안 취약점 점검 (OWASP Top 10 기준)
-- [ ] 정기 보안 감사 체계 수립
+- [x] 개인정보 익명화 처리 확인 (수강생 실명 ↔ 익명 ID 분리)
+  - `anonymization-service.ts`: `anonymizeDisplayName(name)` 마스킹, `redactStudentForAi(student)` PII 제거
+  - `auditPiiExposure(institutionId)`: 기관별 PII 노출 위험 지표 집계
+- [x] PostgreSQL 컬럼 레벨 암호화 적용 (민감 데이터)
+  - `secrets-encryption.ts`: pgcrypto `pgp_sym_encrypt/decrypt` 래퍼
+  - `EncryptedEnvelope { _enc, v, data }` 봉투 패턴 + `safeDecryptIfNeeded` 레거시 호환
+  - `SECRETS_ENCRYPTION_KEY` 환경변수 Fail-Fast 적용
+- [x] 수료 후 5년 데이터 자동 삭제 스케줄 구현 (교육부 지침 준수)
+  - `data-retention.ts`: `runDataRetention()` — 5년 경과 soft-deleted 수강생 PII 영구 삭제
+  - Heartbeat 역할 `data_retention` 케이스 등록 (cron: `0 3 1 1 *`)
+  - `agentRoleEnum`에 `data_retention` 추가 (DB 스키마 마이그레이션 필요)
+  - DRY_RUN 모드: `NODE_ENV=test` 또는 `DATA_RETENTION_DRY_RUN=true`
+- [x] RBAC 전체 엔드포인트 접근 권한 최종 검토
+  - `/onboarding/*`: `authenticate` + `requireRole('student','instructor','admin','super_admin')` 추가
+  - 투어별 역할 세분화: `admin-tour`→admin/super_admin, `ews-tour`→instructor 이상
+  - `/admin/security/rbac-report`: 전체 엔드포인트 역할 매핑 리포트 API
+- [x] 보안 취약점 점검 (OWASP Top 10 기준)
+  - A05 대응 — `security-headers.ts` 미들웨어: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy`, `CSP`, `HSTS(production)`, `X-Powered-By` 제거
+  - `server/src/index.ts`: `app.use(securityHeaders)` — 모든 라우트 앞에 마운트
+- [x] 정기 보안 감사 체계 수립
+  - `/admin/security/audit-report`: 감사 로그 집계 + PII 노출 지표 통합 리포트
+  - `/admin/security/rbac-report`: RBAC 컴플라이언스 검증 리포트
+  - 36개 신규 테스트 (429개 전체 통과)
 
 ---
 
@@ -672,12 +689,14 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 | 항목 | 적용 방안 | 구현 Phase |
 |---|---|---|
 | 데이터 최소 수집 | 수강생 익명 ID 사용, 실명 분리 저장 | Phase 1 |
-| RBAC 접근 제어 | `/student/*`, `/instructor/*`, `/admin/*` 라우트 분리 | Phase 0 |
-| API 키 보안 저장 | 암호화 저장, 화면 마스킹, 코드베이스 하드코딩 금지 | Phase 1 |
+| RBAC 접근 제어 | `/student/*`, `/instructor/*`, `/admin/*` 라우트 분리 + 온보딩 투어별 역할 세분화 | Phase 0/5 |
+| API 키 보안 저장 | pgcrypto `pgp_sym_encrypt` 암호화 봉투 패턴 (Phase 5-5 완료) | Phase 1/5 |
 | 에이전트 인증 | 단기 JWT (실행 시에만 유효), 장기 키 미노출 | Phase 2 |
 | MCP 권한 제한 | Read-only 기본, Write는 Slack 알림 채널만 허용 | Phase 1 |
-| 감사 로그 | 에이전트 외부 접근 이력 전체 기록 | Phase 1 |
-| 데이터 보존 | 수료 후 5년 자동 삭제 스케줄 | Phase 5 |
+| 감사 로그 | 에이전트 외부 접근 이력 전체 기록 + `/admin/security/audit-report` 리포트 API | Phase 1/5 |
+| 데이터 보존 | 수료 후 5년 자동 삭제 스케줄 (`data_retention` Heartbeat) | Phase 5 |
+| OWASP 헤더 | CSP·HSTS·X-Frame·Referrer-Policy 등 7종 보안 헤더 미들웨어 | Phase 5 |
+| PII 익명화 | `anonymizeDisplayName` 마스킹 + `redactStudentForAi` AI 전달 전 PII 제거 | Phase 5 |
 | Webhook 보안 | GitHub Webhook HMAC-SHA256 서명 검증 | Phase 2 |
 
 ---

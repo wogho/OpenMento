@@ -18,6 +18,7 @@ export const agentRoleEnum = pgEnum('agent_role', [
   'ai_tutor',
   'mental_care',
   'portfolio_reviewer',
+  'data_retention',
 ]);
 
 export const agents = pgTable('agents', {
