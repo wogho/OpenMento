@@ -81,6 +81,13 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     // ── 개인 Room 자동 입장 (Phase 2-5: GitHub 코드 리뷰 Push 대상) ──────
     // 연결 즉시 student:<userId> 룸에 입장하여 서버 Push 이벤트를 수신합니다.
     socket.join(`student:${userId}`);
+
+    // ── Admin Room 자동 입장 (Phase 5-1 개선 ③: RAG 임베딩 진행률 Push 대상) ──
+    // admin 역할인 경우 admin:<institutionId> 룸에 입장하여 rag:progress 이벤트를 수신합니다.
+    const role = socket.data.role as string | undefined;
+    if (role === 'admin') {
+      socket.join(`admin:${institutionId}`);
+    }
     // ── 채팅 메시지 수신 → LLM 스트리밍 응답 ─────────────
     socket.on('chat_message', async (payload: ChatMessagePayload) => {
       const { question, agentId, sessionId, courseId } = payload ?? {};

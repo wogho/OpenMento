@@ -103,10 +103,25 @@ services:
     restart: unless-stopped
 
   # ── RAG Worker (Phase 5-A: 임베딩 큐 소비 독립 프로세스) ──────
+  #
   # API 서버에서 BullMQ 큐에 추가된 임베딩 Job을 소비합니다.
   # - 파싱(CPU) + OpenAI 임베딩(Network) + DB 저장을 API 서버와 분리하여 처리
   # - REDIS_URL 없는 환경: 이 서비스 미실행 시 API fallback(직접 호출)이 동작함
   # - concurrency: RAG_WORKER_CONCURRENCY env로 조절 (기본: 2)
+  #
+  # ── 수평 확장 (Phase 5-1 개선 ②) ─────────────────────────────
+  #
+  #   코드 수정 없이 인스턴스 수를 지정하여 처리량을 수평 확장할 수 있습니다.
+  #   BullMQ 큐가 여러 워커 인스턴스에 Job을 자동 분산합니다.
+  #
+  #     # 워커 3개로 스케일 아웃
+  #     docker compose up --scale rag-worker=3
+  #
+  #   클라우드 환경: CPU >= 70% 시 Auto-Scaling Group 트리거 권장
+  #     (AWS ECS Service / GCP Cloud Run Min-Max Instance 설정 참조)
+  #
+  # ── 헬스체크 ─────────────────────────────────────────────────
+  #   GET http://localhost:3001/health → 200 { status: "ok" }
   rag-worker:
     build:
       context: ..
@@ -117,11 +132,18 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       UPLOAD_TMP_DIR: /tmp/uploads
       RAG_WORKER_CONCURRENCY: ${RAG_WORKER_CONCURRENCY:-2}
+      HEALTH_PORT: "3001"
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TZ: ${TZ:-Asia/Seoul}
     volumes:
       - uploads_tmp:/tmp/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       db:
         condition: service_healthy

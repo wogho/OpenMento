@@ -26,6 +26,16 @@ export interface IngestOptions {
   courseId?: string;
   fileName: string;   // 원본 파일명 (확장자 판별용)
   filePath: string;   // OS 임시 디렉토리의 물리 파일 경로
+  /**
+   * 청크 DB 저장 진행률 콜백 (Phase 5-1 개선 ③ — Chunking 컨텍스트 추적)
+   *
+   * current: 현재까지 저장된 청크 수
+   * total:   전체 청크 수
+   *
+   * BullMQ rag-worker에서 job.updateProgress()로 연결되어
+   * QueueEvents → socket.io 'rag:progress' 이벤트로 Admin UI에 실시간 송출됩니다.
+   */
+  onProgress?: (current: number, total: number) => Promise<void>;
 }
 
 export interface IngestResult {
@@ -77,7 +87,7 @@ function runIngestWorker(input: WorkerInput): Promise<WorkerOutput> {
 export async function ingestDocument(
   options: IngestOptions,
 ): Promise<IngestResult> {
-  const { institutionId, courseId, fileName, filePath } = options;
+  const { institutionId, courseId, fileName, filePath, onProgress } = options;
 
   try {
     // 파싱 + 청킹 + 임베딩 — 전부 워커 스레드에서 처리 (메인 루프 블로킹 없음)
@@ -115,6 +125,10 @@ export async function ingestDocument(
       const batch = rows.slice(i, i + BATCH);
       await db.insert(ragDocuments).values(batch);
       saved += batch.length;
+      // 진행률 콜백 — BullMQ job.updateProgress()로 연결됩니다 (optional)
+      if (onProgress) {
+        await onProgress(saved, rows.length);
+      }
     }
 
     return {

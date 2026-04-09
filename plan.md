@@ -587,9 +587,12 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 | Phase 5-B | Serverless Function(AWS Lambda / Cloudflare Workers) 전환 | 다기관 확산 시 |
 
 **작업 항목**:
-- [ ] Redis + Bull Queue 기반 임베딩 작업 큐 구현
-- [ ] `packages/rag-worker/` 독립 서비스로 분리
-- [ ] `docker-compose.yml`에 `rag-worker` + `redis` 서비스 추가
+- [x] Redis + Bull Queue 기반 임베딩 작업 큐 구현
+- [x] `packages/rag-worker/` 독립 서비스로 분리
+- [x] `docker-compose.yml`에 `rag-worker` + `redis` 서비스 추가
+- [x] **[개선①]** DLQ + `@bull-board/express` 큐 모니터링 Admin 대시보드 (`GET /admin/queues`)
+- [x] **[개선②]** `rag-worker` HTTP 헬스 서버 (`:3001/health`) + Docker 헬스체크 + 수평 확장 문서화 (`--scale rag-worker=3`)
+- [x] **[개선③]** `job.updateProgress()` + BullMQ `QueueEvents` + socket.io `rag:progress` 임베딩 진행률 실시간 Admin Push
 
 ---
 
@@ -964,5 +967,70 @@ Phase 5-A: BullMQ Queue + 독립 rag-worker 프로세스로 완전 분리.
 |---|---|
 | REDIS_URL 없음 (로컬 개발) | 직접 `ingestDocument()` 호출 (기존 worker_threads 방식 유지) |
 | REDIS_URL 있음 (Docker/운영) | BullMQ Job → rag-worker 프로세스 비동기 처리 |
+
+**테스트 현황**: 161개 전체 통과 / tsc 오류 0개 (신규 파일 기준)
+
+---
+
+## 부록 L. Phase 5-1 개선 반영 이력 (2026-04-09)
+
+> RAG 비동기 워커 시스템을 실제 상용 B2B 환경 수준으로 고도화하기 위해 Gemini 제언 3가지를 즉시 반영하였습니다.
+
+### L-1. DLQ + Bull Board Admin 큐 모니터링 대시보드 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | 최대 재시도(3회) 초과 실패 Job이 큐 "failed" 상태로 쌓여도 관리자가 웹에서 확인·재처리 불가 |
+| **해결** | `@bull-board/api` + `@bull-board/express` 설치 후 `/admin/queues` 경로에 UI 마운트 |
+| **DLQ 보관** | `removeOnFail: { count: 500 }` 설정(기존)으로 최대 500개 실패 Job 보존 — Bull Board Failed 탭에서 클릭 한 번 Retry 가능 |
+| **보안** | `authenticate + requireRole('admin')` 미들웨어로 admin 역할 전용 접근 제한 |
+| **큐 등록** | `rag-ingest` + `github-webhook` 큐 모두 등록 (`readOnlyMode: false, allowRetries: true`) |
+
+**신규 파일**: `server/src/routes/bull-board.ts`
+
+---
+
+### L-2. RAG Worker 수평 확장(Horizontal Scaling) 준비 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | rag-worker 1대로 대형 기관 동시 교재 업로드 시 처리 지연 우려 |
+| **해결** | `packages/rag-worker/src/index.ts`에 Node.js 내장 `http` 모듈로 경량 헬스 서버(`:3001/health`) 추가 |
+| **Docker 헬스체크** | `docker-compose.yml` rag-worker 서비스에 Node.js 기반 healthcheck 추가 (interval: 30s, start_period: 15s) |
+| **수평 확장** | `docker compose up --scale rag-worker=3` — 코드 수정 없이 인스턴스 수 지정 확장 가능 (BullMQ가 자동 분산) |
+| **클라우드 가이드** | docker-compose.yml 주석에 AWS ECS / GCP Cloud Run Auto-Scaling 적용 지침 문서화 |
+
+**수정 파일**: `packages/rag-worker/src/index.ts`, `docker/docker-compose.yml`
+
+---
+
+### L-3. Chunking 진행률 실시간 Admin Push ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | 수백 페이지 문서 Job 처리 시 진행률 파악 불가 — "처리 중" 상태만 표시 |
+| **해결** | 3-레이어 진행률 파이프라인 구축 |
+| **Layer 1** | `packages/rag/src/pipeline.ts` `IngestOptions.onProgress(current, total)` 콜백 추가 — DB 배치(50개) 저장마다 호출 |
+| **Layer 2** | `packages/rag-worker/src/index.ts`: `onProgress` → `job.updateProgress({ current, total, institutionId, deliveryId, phase })` |
+| **Layer 3** | `server/src/queues/rag-queue-events.ts`: BullMQ `QueueEvents` subscribe → `io.to('admin:<institutionId>').emit('rag:progress', { percent: 0~100 })` |
+| **소켓 룸** | `server/src/socket/chat.handler.ts`: admin 역할 소켓 연결 시 `admin:<institutionId>` 룸 자동 입장 |
+
+**신규 파일**: `server/src/queues/rag-queue-events.ts`  
+**수정 파일**: `packages/rag/src/pipeline.ts`, `packages/rag-worker/src/index.ts`, `server/src/socket/chat.handler.ts`, `server/src/index.ts`
+
+---
+
+**진행률 이벤트 스키마** (프론트엔드 연동 참조):
+
+```typescript
+// socket.io 'rag:progress' 이벤트 페이로드
+interface RagProgressEvent {
+  jobId: string;       // BullMQ Job ID (= deliveryId)
+  deliveryId: string;  // 업로드 요청 UUID
+  current: number;     // 저장 완료된 청크 수
+  total: number;       // 전체 청크 수
+  percent: number;     // 0~100 (Math.round)
+}
+```
 
 **테스트 현황**: 161개 전체 통과 / tsc 오류 0개 (신규 파일 기준)

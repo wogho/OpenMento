@@ -30,6 +30,7 @@
 
 import { Worker, UnrecoverableError } from 'bullmq';
 import pino from 'pino';
+import { createServer } from 'node:http';
 import { ingestDocument } from '@educlip/rag';
 
 const logger = pino({
@@ -97,6 +98,17 @@ const worker = new Worker<{
       courseId,
       fileName,
       filePath,
+      // ── Phase 5-1 개선 ③: DB 배치 저장마다 진행률 갱신 ──────────────────
+      // QueueEvents → socket.io 'rag:progress' → Admin 대시보드 진행률 바 업데이트
+      onProgress: async (current, total) => {
+        await job.updateProgress({
+          current,
+          total,
+          institutionId,
+          deliveryId,
+          phase: 'db_save' as const,
+        });
+      },
     });
 
     const durationMs = Date.now() - startMs;
@@ -138,9 +150,34 @@ logger.info(
   '[rag-worker] Worker 시작',
 );
 
+// ── Phase 5-1 개선 ②: HTTP 헬스 서버 (수평 확장 준비) ────────────────────────
+//
+//   Docker Compose Healthcheck 및 Load Balancer 생존 확인에 사용됩니다.
+//   docker compose up --scale rag-worker=3 으로 수평 확장 시 각 인스턴스의 상태를
+//   독립적으로 점검할 수 있습니다.
+//
+//   GET http://localhost:3001/health → 200 { status: "ok" }
+const HEALTH_PORT = Number(process.env.HEALTH_PORT ?? '3001');
+let workerReady = false;
+worker.on('ready', () => { workerReady = true; });
+
+const healthServer = createServer((_req, res) => {
+  if (workerReady || worker.isRunning()) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', queue: RAG_INGEST_QUEUE_NAME }));
+  } else {
+    res.writeHead(503, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'starting' }));
+  }
+});
+healthServer.listen(HEALTH_PORT, () => {
+  logger.info({ port: HEALTH_PORT }, '[rag-worker] 헬스 서버 시작');
+});
+
 // ── 정상 종료 ─────────────────────────────────────────────────────────────────
 async function gracefulShutdown(signal: string): Promise<void> {
   logger.info(`${signal} received — rag-worker 종료 중...`);
+  healthServer.close();
   await worker.close();
   logger.info('[rag-worker] 종료 완료');
   process.exit(0);

@@ -8,6 +8,7 @@ import instructorRouter from './routes/instructor.js';
 import adminRouter from './routes/admin.js';
 import webhookRouter from './routes/webhook.js';
 import portfolioRouter from './routes/portfolio.js';
+import { createBullBoardRouter, BULL_BOARD_BASE_PATH } from './routes/bull-board.js';
 import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
 import { startWebhookWorker, closeWebhookWorker } from './queues/webhook.worker.js';
@@ -15,6 +16,7 @@ import { initEwsThresholdsDb, loadEwsThresholdsFromDb } from './services/ews-thr
 import { initInstitutionSettingsDb, loadAllInstitutionSettings, getInstitutionSetting } from './services/institution-settings-service.js';
 import { closeWebhookQueue } from './queues/webhook.queue.js';
 import { closeRagIngestQueue } from './queues/rag-ingest.queue.js';
+import { startRagQueueEvents, closeRagQueueEvents } from './queues/rag-queue-events.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
 
@@ -51,6 +53,10 @@ app.use('/student', chatLimiter, studentRouter);
 app.use('/instructor', adminLimiter, instructorRouter);
 app.use('/admin', adminLimiter, adminRouter);
 app.use('/portfolio', chatLimiter, portfolioRouter);
+
+// ── BullMQ 큐 모니터링 대시보드 (Phase 5-1 개선 ①: DLQ + Admin UI) ──────────
+// admin 역할 전용, REDIS_URL 있을 때만 활성화됩니다.
+app.use(BULL_BOARD_BASE_PATH, adminLimiter, createBullBoardRouter());
 
 // ── 미등록 라우트 처리 ────────────────────────────────────
 app.use((_req, res) => {
@@ -110,6 +116,9 @@ httpServer.listen(PORT, () => {
   // ── BullMQ Webhook Worker 기동 (Phase 2-5 개선 ①) ───────────
   // REDIS_URL 환경변수가 있을 때만 Worker가 시작되고, 없으면 null 반환
   startWebhookWorker();
+  // ── BullMQ QueueEvents 구독 시작 (Phase 5-1 개선 ③) ────────
+  // rag-worker의 job.updateProgress() → socket.io admin 룸으로 진행률 브릿지
+  startRagQueueEvents();
 });
 
 // 정상 종료 Handler
@@ -119,6 +128,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
   await closeWebhookWorker();
   await closeWebhookQueue();
   await closeRagIngestQueue();
+  await closeRagQueueEvents();
   httpServer.close(() => process.exit(0));
 }
 
