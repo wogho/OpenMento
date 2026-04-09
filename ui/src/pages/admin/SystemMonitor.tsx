@@ -165,7 +165,29 @@ function ServiceCard({ info }: { info: ServiceInfo }) {
   );
 }
 
-// ── 로그 보기 모달 ─────────────────────────────────────────────────────────────
+// ── 로그 보기 모달 (Phase 5-4 개선: tail-N + 키워드 검색 + 하이라이트) ──────
+
+const LOG_CHUNK_SIZE = 200; // 한 번에 표시할 최대 줄 수
+
+/**
+ * 로그 문자열에서 키워드를 찾아 <mark> 태그로 감싸 하이라이트합니다.
+ * XSS 방지를 위해 기타 HTML 특수문자를 먼저 이스케이프합니다.
+ */
+function highlightKeyword(text: string, keyword: string): string {
+  // HTML 특수문자 이스케이프 (XSS 방지)
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  if (!keyword.trim()) return escaped;
+
+  // 키워드 자체도 이스케이프하여 정규식 특수문자 주입 방지
+  const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${safeKeyword})`, 'gi');
+  return escaped.replace(regex, '<mark class="bg-yellow-200 text-yellow-900 rounded px-0.5">$1</mark>');
+}
 
 function LogModal({
   log,
@@ -176,24 +198,130 @@ function LogModal({
   agentName: string;
   onClose: () => void;
 }) {
+  const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(LOG_CHUNK_SIZE);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // 전체 줄 분리 (메모이제이션)
+  const allLines = log.split('\n');
+  const totalLines = allLines.length;
+
+  // 검색어가 있으면 매칭 줄만 필터링, 없으면 전체 줄 사용
+  const filteredLines = search.trim()
+    ? allLines.filter((line) => line.toLowerCase().includes(search.toLowerCase()))
+    : allLines;
+
+  // 가장 최근 줄부터 표시 (tail): 마지막 visibleCount줄을 슬라이스
+  const displayLines = filteredLines.slice(Math.max(0, filteredLines.length - visibleCount));
+  const hasMore = filteredLines.length > visibleCount;
+
+  const matchCount = search.trim()
+    ? filteredLines.length
+    : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-[680px] max-w-[95vw] max-h-[75vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-xl shadow-2xl w-[760px] max-w-[95vw] max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>
             <div className="font-semibold text-gray-800">실행 로그</div>
-            <div className="text-xs text-gray-400 mt-0.5">{agentName}</div>
+            <div className="text-xs text-gray-400 mt-0.5">
+              {agentName} &middot; 전체 {totalLines.toLocaleString()}줄
+              {matchCount !== null && (
+                <span className="ml-1 text-yellow-600 font-medium">
+                  검색 결과: {matchCount.toLocaleString()}줄
+                </span>
+              )}
+            </div>
           </div>
           <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition" onClick={onClose}>
             ✕
           </button>
         </div>
-        <pre className="flex-1 overflow-auto p-5 text-xs font-mono text-gray-700 bg-gray-50 whitespace-pre-wrap leading-relaxed">
-          {log || '(로그 없음)'}
-        </pre>
+
+        {/* 검색 바 */}
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">🔍</span>
+            <input
+              type="text"
+              placeholder="로그 내 키워드 검색..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setVisibleCount(LOG_CHUNK_SIZE); // 검색어 변경 시 표시 줄 수 초기화
+              }}
+              className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+            />
+            {search && (
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                onClick={() => setSearch('')}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 로그 본문 */}
+        <div ref={listRef} className="flex-1 overflow-auto bg-gray-950">
+          {/* 더보기 버튼 (위쪽에 이전 로그가 있을 때) */}
+          {hasMore && (
+            <div className="flex justify-center py-2 bg-gray-900 sticky top-0 z-10">
+              <button
+                className="px-4 py-1.5 rounded-full bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 transition"
+                onClick={() => setVisibleCount((prev) => prev + LOG_CHUNK_SIZE)}
+              >
+                ↑ 이전 {Math.min(LOG_CHUNK_SIZE, filteredLines.length - visibleCount).toLocaleString()}줄 더 보기
+                (총 {(filteredLines.length - visibleCount).toLocaleString()}줄 숨김)
+              </button>
+            </div>
+          )}
+
+          {displayLines.length === 0 ? (
+            <p className="text-center text-gray-500 text-sm py-10">
+              {search ? '검색 결과가 없습니다.' : '(로그 없음)'}
+            </p>
+          ) : (
+            <div className="p-4 space-y-0.5 font-mono text-xs">
+              {displayLines.map((line, i) => (
+                <div
+                  key={i}
+                  className="flex gap-3 leading-relaxed hover:bg-gray-800/60 rounded px-1 -mx-1"
+                >
+                  <span className="select-none text-gray-600 text-right shrink-0 w-10">
+                    {filteredLines.length - displayLines.length + i + 1}
+                  </span>
+                  <span
+                    className="text-gray-200 break-all whitespace-pre-wrap flex-1"
+                    // eslint-disable-next-line react/no-danger
+                    dangerouslySetInnerHTML={{ __html: highlightKeyword(line, search) }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 푸터 */}
+        <div className="px-5 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs text-gray-400">
+          <span>
+            {displayLines.length.toLocaleString()}줄 표시 중 / 전체 {(search ? filteredLines : allLines).length.toLocaleString()}줄
+          </span>
+          <button
+            className="px-3 py-1 rounded-md border border-gray-200 hover:bg-gray-100 text-gray-500 transition"
+            onClick={() => {
+              navigator.clipboard?.writeText(log).catch(() => {/* clipboard 미지원 환경 무시 */});
+            }}
+          >
+            📋 전체 복사
+          </button>
+        </div>
       </div>
     </div>
   );

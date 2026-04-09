@@ -65,6 +65,28 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     }
   });
 
+  // ── Admin 룸 보호 미들웨어 (Phase 5-4 개선) ──────────────────────────
+  // socket.adapter 'join-room' 이벤트를 감청하여 admin:* 룸에 대한
+  // 비관리자의 진입을 서버 레벨에서 차단합니다.
+  // JWT 토큰 위변조 방어 이중화: 미들웨어 통과 후에도 룸 단위로 재검증합니다.
+  const ioInstance = io; // 클로저 내 null 참조 방지를 위해 로컬 변수에 캡처
+  ioInstance.of('/').adapter.on('join-room', (room: string, id: string) => {
+    if (!room.startsWith('admin:')) return;
+
+    const socket = ioInstance.sockets.sockets.get(id);
+    if (!socket) return;
+
+    if (socket.data.role !== 'admin') {
+      // 비관리자가 admin 룸 진입을 시도한 경우 즉시 퇴장 처리 및 경고 로그
+      void socket.leave(room);
+      socket.emit('error', { message: '관리자 전용 채널에 접근 권한이 없습니다.' });
+      // 보안 감사 로그용 경고 출력
+      const userId = String(socket.data.userId ?? 'unknown');
+      const role   = String(socket.data.role   ?? 'unknown');
+      console.warn(`[socket][security] 비인가 admin 룸 접근 시도 — socketId=${id} userId=${userId} role=${role} room=${room}`);
+    }
+  });
+
   io.on('connection', (socket) => {
     const { userId, institutionId } = socket.data as {
       userId: string;
@@ -72,10 +94,19 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     };
 
     // ── 세션 룸 입장 ──────────────────────────────────────
-    socket.on('join_session', (sessionId: string) => {
-      if (typeof sessionId === 'string' && sessionId.length > 0) {
-        socket.join(`session:${sessionId}`);
+    // sessionId는 UUID 또는 영숫자/하이픈/언더스코어만 허용합니다.
+    // admin:*, student:*, user:* 등 보호된 룸 네임스페이스 우회를 방지합니다.
+    socket.on('join_session', (sessionId: unknown) => {
+      if (
+        typeof sessionId !== 'string' ||
+        sessionId.length === 0 ||
+        sessionId.length > 128 ||
+        !/^[a-zA-Z0-9_-]+$/.test(sessionId)
+      ) {
+        socket.emit('error', { message: '잘못된 세션 ID 형식입니다.' });
+        return;
       }
+      socket.join(`session:${sessionId}`);
     });
 
     // ── 개인 Room 자동 입장 (Phase 2-5: GitHub 코드 리뷰 Push 대상) ──────

@@ -1337,3 +1337,52 @@ plan.md 5-3 시나리오 그대로 반영:
 ---
 
 **테스트 현황**: 358개 전체 통과 (신규 47개 포함) / tsc 오류 0개 (신규 파일 기준)
+
+---
+
+## 부록 N. Phase 5-4 개선 반영 이력 (2026-04-09)
+
+> Phase 5-4 완료 검증 후 보안·안정성·UX 취약점 3가지를 즉시 반영하였습니다.
+
+### N-1. [보안] Socket.io Admin 룸 JWT 인증 강화 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | Socket.io `admin:*` 룸에 비관리자 클라이언트가 임의 진입하여 `agent:status_change` 이벤트 수신 가능 우려 |
+| **해결 ①** | `io.of('/').adapter.on('join-room', ...)` 어댑터 레벨 가드 추가 — `admin:*` 룸 진입 시 `socket.data.role !== 'admin'` 검사 후 즉시 `socket.leave()` + 경고 로그 출력 |
+| **해결 ②** | `join_session` 이벤트 핸들러에 sessionId 포맷 화이트리스트 검증 추가 — `/^[a-zA-Z0-9_-]+$/` (영숫자·하이픈·언더스코어, 1~128자) 이외 값 거부 → `admin:`, `student:` 등 보호 룸 네임스페이스 우회 시도 차단 |
+| **보안 계층** | JWT 미들웨어(1차) + 어댑터 룸 가드(2차) 이중화로 토큰 위변조 방어 강화 |
+
+**수정 파일**: `server/src/socket/chat.handler.ts`
+
+---
+
+### N-2. [안정성] 헬스체크 API Cascading Failure 방지 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | DB/Redis가 Hang 상태일 때 `/admin/system/status` 폴링 요청이 무한 대기 → Node.js 이벤트 루프·커넥션 풀 고갈 위험 |
+| **해결** | `withTimeout<T>(promise, ms, fallback)` 유틸 신설 — `Promise.race([promise, timeout])` 패턴으로 지정 시간 초과 시 fallback 반환 |
+| **DB 타임아웃** | `DB_HEALTH_TIMEOUT_MS = 3000` — 3초 초과 시 `{ status: 'down', detail: '응답 없음 (3000ms 타임아웃)' }` 반환 |
+| **Redis 타임아웃** | `REDIS_HEALTH_TIMEOUT_MS = 2000` — 2초 초과 시 `{ status: 'down', detail: '응답 없음 (2000ms 타임아웃)' }` 반환 |
+| **ioredis 최적화** | `connectTimeout: 1500`, `maxRetriesPerRequest: 0` — 타임아웃 발생 시 재시도 없이 즉시 실패 처리하여 지연 최소화 |
+
+**수정 파일**: `server/src/services/system-status.ts`
+
+---
+
+### N-3. [UX/성능] 로그 뷰어 Tail-N + 키워드 검색 + 하이라이트 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | `stdoutExcerpt` 가 MB 단위로 커질 경우 모달 열기 시 React UI 스레드 블로킹 |
+| **Tail-N 렌더링** | 기본 최근 200줄만 표시 (`LOG_CHUNK_SIZE = 200`) — 줄 번호 표시, "↑ 이전 N줄 더 보기" 버튼으로 청크 단위 추가 로드 |
+| **키워드 검색** | 검색 입력 시 매칭 줄만 필터링 + 검색 결과 줄 수 표시, 검색어 변경 시 visibleCount 초기화 |
+| **하이라이트** | `highlightKeyword()` 함수 — HTML 특수문자 이스케이프(XSS 방지) 후 키워드 `<mark>` 태그 감싸기, 정규식 특수문자 이스케이프 처리 |
+| **전체 복사** | "📋 전체 복사" 버튼 → `navigator.clipboard.writeText(log)` (미지원 환경 무시) |
+
+**수정 파일**: `ui/src/pages/admin/SystemMonitor.tsx`
+
+---
+
+**테스트 현황**: 393개 전체 통과 (Phase 5-4 개선 신규 35개 포함) / tsc 오류 0개 (수정 파일 기준)

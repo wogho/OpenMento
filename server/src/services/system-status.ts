@@ -33,19 +33,60 @@ export interface SystemStatusResult {
   timestamp: string;
 }
 
-/** PostgreSQL SELECT 1 헬스체크 */
-async function checkDbHealth(): Promise<ServiceInfo> {
-  const start = Date.now();
-  try {
-    await db.execute(sql`SELECT 1`);
-    return { name: 'Database', status: 'ok', latencyMs: Date.now() - start };
-  } catch (err) {
-    logger.warn({ err }, '[system-status] DB 헬스체크 실패');
-    return { name: 'Database', status: 'down', latencyMs: null, detail: err instanceof Error ? err.message : String(err) };
-  }
+/**
+ * withTimeout — Promise.race 기반 헬스체크 타임아웃 유틸 (Phase 5-4 개선)
+ *
+ * DB/Redis가 장시간 응답하지 않을 때(Hang) 이벤트 루프 고갈 방지를 위해
+ * 지정된 ms 내에 응답이 없으면 즉각 fallback 값을 반환합니다.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  const timeout = new Promise<T>((_, reject) =>
+    setTimeout(() => reject(new Error(`헬스체크 타임아웃 (${ms}ms 초과)`)), ms),
+  );
+  return Promise.race([promise, timeout]).catch((err: unknown) => {
+    logger.warn({ err }, '[system-status] 헬스체크 타임아웃 — fallback 반환');
+    return fallback;
+  });
 }
 
-/** Redis ping 헬스체크 (REDIS_URL 없으면 unavailable) */
+/** DB 헬스체크 타임아웃 기본값 (ms) */
+const DB_HEALTH_TIMEOUT_MS = 3000;
+
+/** Redis 헬스체크 타임아웃 기본값 (ms) */
+const REDIS_HEALTH_TIMEOUT_MS = 2000;
+
+/** PostgreSQL SELECT 1 헬스체크 (최대 3초 대기) */
+async function checkDbHealth(): Promise<ServiceInfo> {
+  const start = Date.now();
+
+  const TIMEOUT_FALLBACK: ServiceInfo = {
+    name: 'Database',
+    status: 'down',
+    latencyMs: null,
+    detail: `응답 없음 (${DB_HEALTH_TIMEOUT_MS}ms 타임아웃)`,
+  };
+
+  return withTimeout(
+    (async () => {
+      try {
+        await db.execute(sql`SELECT 1`);
+        return { name: 'Database', status: 'ok' as ServiceStatus, latencyMs: Date.now() - start };
+      } catch (err) {
+        logger.warn({ err }, '[system-status] DB 헬스체크 실패');
+        return {
+          name: 'Database',
+          status: 'down' as ServiceStatus,
+          latencyMs: null,
+          detail: err instanceof Error ? err.message : String(err),
+        };
+      }
+    })(),
+    DB_HEALTH_TIMEOUT_MS,
+    TIMEOUT_FALLBACK,
+  );
+}
+
+/** Redis ping 헬스체크 (REDIS_URL 없으면 unavailable, 최대 2초 대기) */
 async function checkRedisHealth(): Promise<ServiceInfo> {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
@@ -53,28 +94,47 @@ async function checkRedisHealth(): Promise<ServiceInfo> {
   }
 
   const start = Date.now();
-  try {
-    // ioredis 동적 import — 런타임에 bullmq 의존성 활용
-    const { default: Redis } = await import('ioredis');
-    const url = new URL(redisUrl);
-    const client = new Redis({
-      host: url.hostname,
-      port: parseInt(url.port || '6379', 10),
-      password: url.password || undefined,
-      username: url.username || undefined,
-      tls: url.protocol === 'rediss:' ? {} : undefined,
-      connectTimeout: 3000,
-      maxRetriesPerRequest: 1,
-      lazyConnect: true,
-    });
-    await client.connect();
-    await client.ping();
-    await client.quit();
-    return { name: 'Redis', status: 'ok', latencyMs: Date.now() - start };
-  } catch (err) {
-    logger.warn({ err }, '[system-status] Redis 헬스체크 실패');
-    return { name: 'Redis', status: 'down', latencyMs: null, detail: err instanceof Error ? err.message : String(err) };
-  }
+
+  const TIMEOUT_FALLBACK: ServiceInfo = {
+    name: 'Redis',
+    status: 'down',
+    latencyMs: null,
+    detail: `응답 없음 (${REDIS_HEALTH_TIMEOUT_MS}ms 타임아웃)`,
+  };
+
+  return withTimeout(
+    (async () => {
+      try {
+        // ioredis 동적 import — 런타임에 bullmq 의존성 활용
+        const { default: Redis } = await import('ioredis');
+        const url = new URL(redisUrl);
+        const client = new Redis({
+          host: url.hostname,
+          port: parseInt(url.port || '6379', 10),
+          password: url.password || undefined,
+          username: url.username || undefined,
+          tls: url.protocol === 'rediss:' ? {} : undefined,
+          connectTimeout: 1500,      // withTimeout 외 내부 연결 타임아웃도 단축
+          maxRetriesPerRequest: 0,   // 타임아웃 상황에서 재시도 없이 즉시 실패
+          lazyConnect: true,
+        });
+        await client.connect();
+        await client.ping();
+        await client.quit();
+        return { name: 'Redis', status: 'ok' as ServiceStatus, latencyMs: Date.now() - start };
+      } catch (err) {
+        logger.warn({ err }, '[system-status] Redis 헬스체크 실패');
+        return {
+          name: 'Redis',
+          status: 'down' as ServiceStatus,
+          latencyMs: null,
+          detail: err instanceof Error ? err.message : String(err),
+        };
+      }
+    })(),
+    REDIS_HEALTH_TIMEOUT_MS,
+    TIMEOUT_FALLBACK,
+  );
 }
 
 /** Heartbeat 스케줄러 상태 조회 */
