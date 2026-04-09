@@ -408,7 +408,7 @@ export default function PortfolioPage() {
 
           {/* 단계 트래커 */}
           {workflow && (
-            <section className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+            <section id="portfolio-stage-tracker" className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
               <StageTracker stage={workflow.stage} />
             </section>
           )}
@@ -484,7 +484,7 @@ export default function PortfolioPage() {
 
           {/* ── 인터뷰 단계 ── */}
           {phase === 'interview' && workflow && (
-            <section className="space-y-3">
+            <section id="portfolio-interview-chat" className="space-y-3">
               <div className="h-[520px]">
                 <InterviewChat
                   messages={messages}
@@ -567,10 +567,12 @@ export default function PortfolioPage() {
             <section className="space-y-4">
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
                 <h2 className="text-base font-bold text-gray-800">📊 독창성 분석 결과</h2>
+                <div id="portfolio-originality-gauge">
                 <OriginalityGauge
                   similarityScore={analysisResult.topSimilarity}
                   verdict={analysisResult.verdict}
                 />
+                </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">

@@ -53,6 +53,16 @@ function getOrCreateSocket(token: string): Socket {
   return sharedSocket;
 }
 
+/**
+ * 현재 연결된 소켓 인스턴스를 반환합니다.
+ * 소켓이 없거나 아직 연결 전이면 token 으로 생성합니다.
+ * onboarding 훅 등 채팅 밖 컨텍스트에서 소켓 이벤트를 구독할 때 사용합니다.
+ * Gemini 제언 ②: onboarding:completed 크로스-탭 동기화에 활용.
+ */
+export function getSharedSocket(token: string): Socket {
+  return getOrCreateSocket(token);
+}
+
 interface UseChatOptions {
   agentId: string;
   courseId?: string;

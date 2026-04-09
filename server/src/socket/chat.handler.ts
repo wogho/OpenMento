@@ -82,6 +82,9 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     // 연결 즉시 student:<userId> 룸에 입장하여 서버 Push 이벤트를 수신합니다.
     socket.join(`student:${userId}`);
 
+    // user:<userId> 개인 룸 입장 — 온보딩:completed 브로드캐스트 수신 (Gemini 제언 ②)
+    socket.join(`user:${userId}`);
+
     // ── Admin Room 자동 입장 (Phase 5-1 개선 ③: RAG 임베딩 진행률 Push 대상) ──
     // admin 역할인 경우 admin:<institutionId> 룸에 입장하여 rag:progress 이벤트를 수신합니다.
     const role = socket.data.role as string | undefined;

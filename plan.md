@@ -1231,3 +1231,59 @@ plan.md 5-3 시나리오 그대로 반영:
 ---
 
 **테스트 현황**: **278개 전체 통과** (Phase 5-3 신규 53개 포함) / tsc 오류 0개
+
+---
+
+## 부록 P. Phase 5-3 개선 반영 이력 (2026-04-09)
+
+> Gemini 제언 3가지를 Phase 5-3 온보딩 구현에 즉시 반영하였습니다.
+
+### P-1. 투어 부분 진행 척도 (Intermediate Progress) 트래킹 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | 전체 투어를 완료해야만 DB에 기록 — 중간 이탈 후 재접속 시 처음부터 재시작 |
+| **해결** | `onboarding_completions` 테이블에 `last_step_index integer DEFAULT -1` 추가 |
+| **마이그레이션** | `0012_onboarding_progress.sql` — ALTER TABLE + completed_at NOT NULL 해제 + 진행 중 인덱스 |
+| **API** | `PATCH /onboarding/progress { tourId, lastStepIndex }` 신설 — UPSERT, 완료 후 재진행 방지 |
+| **프론트엔드** | `useFeatureTour` 훅의 `onHighlightStarted` 콜백에서 스텝 전환 시 서버 동기화 |
+| **재개 로직** | `GET /status` 가 `progressMap` 함께 반환 → 재접속 시 `driver.drive(lastStepIndex)` |
+
+**신규 파일**: `packages/db/drizzle/0012_onboarding_progress.sql`  
+**수정 파일**: `packages/db/src/schema/onboarding_completions.ts`, `server/src/routes/onboarding.ts`
+
+---
+
+### P-2. 브라우저 간 상태 동기화 (Cross-Tab Sync) ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | PC/태블릿 멀티 기기에서 한 쪽 투어 완료 시 다른 탭에 재팝업 발생 |
+| **해결** | WebSocket은 이미 Phase 1에 구현됨 → `user:{userId}` 개인 룸 join 추가 후 완료 이벤트 emit |
+| **서버** | `chat.handler.ts` — 연결 즉시 `socket.join('user:{userId}')` 추가 |
+| **서버** | `onboarding.ts` — POST /complete 성공 시 `io?.to('user:{userId}').emit('onboarding:completed', { tourId })` |
+| **프론트엔드** | `useChat.ts` — `getSharedSocket(token)` export 신설 |
+| **프론트엔드** | `useFeatureTour.ts` — `socket.on('onboarding:completed')` 수신 시 `driver.destroy()` 호출 |
+
+**수정 파일**: `server/src/socket/chat.handler.ts`, `server/src/routes/onboarding.ts`, `ui/src/hooks/useChat.ts`, `ui/src/hooks/useFeatureTour.ts`
+
+---
+
+### P-3. 기능별 분리 투어 (Feature-based Tours) ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | 모든 기능이 단일 `admin-tour`에 통합 — 도메인별 맥락 없는 안내 |
+| **해결** | `useFeatureTour(tourId, triggerCondition)` 범용 훅 신설 (`useOnboarding`을 thin wrapper로 리팩터) |
+| **신규 투어** | `portfolio-tour` — `/portfolio` 최초 방문 시 수강생에게 3단계 포트폴리오 워크플로우 안내 |
+| **신규 투어** | `ews-tour` — `/admin` 최초 방문 시 관리자/강사에게 EWS 대시보드·임계치·스케줄 3단계 안내 |
+| **DOM ID 추가** | `PortfolioPage.tsx` — `#portfolio-stage-tracker`, `#portfolio-interview-chat`, `#portfolio-originality-gauge` |
+| **컴포넌트** | `OnboardingTour.tsx` — 라우트별 플로팅 버튼 3개(🧭/📋/📊) + 각 tour 자동 실행 |
+| **VALID_TOUR_IDS** | 서버 화이트리스트에 `'portfolio-tour'`, `'ews-tour'` 추가 |
+
+**신규 파일**: `ui/src/hooks/useFeatureTour.ts`  
+**수정 파일**: `ui/src/tours/scenarios.ts`, `ui/src/hooks/useOnboarding.ts`, `ui/src/components/OnboardingTour.tsx`, `ui/src/pages/PortfolioPage.tsx`
+
+---
+
+**테스트 현황**: 311개 전체 통과 (신규 33개 포함) / tsc 오류 0개

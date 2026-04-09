@@ -13,6 +13,7 @@ import {
   pgTable,
   uuid,
   text,
+  integer,
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core';
@@ -29,9 +30,19 @@ export const onboardingCompletions = pgTable(
     institutionId: uuid('institution_id')
       .notNull()
       .references(() => institutions.id, { onDelete: 'cascade' }),
-    /** 완료한 투어 ID (예: 'admin-tour', 'student-tour') */
+    /** 완료한 투어 ID (예: 'admin-tour', 'student-tour', 'portfolio-tour', 'ews-tour') */
     tourId: text('tour_id').notNull(),
-    completedAt: timestamp('completed_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * 마지막으로 진행한 스텝 인덱스 (0-based).
+     * -1 = 아직 시작 안 함, 0+ = 진행 중 / 완료
+     * Gemini 제언 [개선①]: 투어 중간 이탈 시 재접속 후 이어서 시작 가능
+     */
+    lastStepIndex: integer('last_step_index').notNull().default(-1),
+    /**
+     * 투어를 완전히 완료한 시각. null이면 진행 중(in-progress).
+     * Gemini 제언 [개선①]: completedAt이 null이면 lastStepIndex 기준으로 재개.
+     */
+    completedAt: timestamp('completed_at', { withTimezone: true }),
   },
   (table) => [
     // 사용자당 투어별 1회만 기록 (중복 방지)

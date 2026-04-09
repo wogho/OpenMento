@@ -11,11 +11,15 @@
  *     1단계: AI 튜터 입력창 안내
  *     2단계: 교재 인용 영역 안내
  *     3단계: 포트폴리오 기획서 이동 안내
+ *
+ * Gemini 제언 ③: 도메인별 기능 투어 추가
+ *   portfolio-tour: /portfolio 첫 방문 시 자동 실행
+ *   ews-tour:       /admin 첫 방문 시 자동 실행 (admin 역할 전용)
  */
 
 import type { DriveStep } from 'driver.js';
 
-export type TourId = 'admin-tour' | 'student-tour';
+export type TourId = 'admin-tour' | 'student-tour' | 'portfolio-tour' | 'ews-tour';
 
 export interface TourScenario {
   tourId: TourId;
@@ -110,7 +114,95 @@ export const studentTour: TourScenario = {
   ],
 };
 
-export const ALL_TOURS: TourScenario[] = [adminTour, studentTour];
+// ── 포트폴리오 기능 투어 (Gemini 제언 ③) ────────────────────────────────────────
+// /portfolio 경로 최초 방문 시 자동 실행
+
+export const portfolioTour: TourScenario = {
+  tourId: 'portfolio-tour',
+  roles: ['student'],
+  entryPath: '/portfolio',
+  steps: [
+    {
+      element: '#portfolio-stage-tracker',
+      popover: {
+        title: '📋 4단계 포트폴리오 워크플로우',
+        description:
+          '인터뷰 → 기획서 작성 → 보안 검토 → 독창성 인증의 단계를 거칩니다. ' +
+          '현재 단계가 강조되어 어디까지 진행됐는지 항상 확인할 수 있습니다.',
+        side: 'bottom',
+        align: 'center',
+      },
+    },
+    {
+      element: '#portfolio-interview-chat',
+      popover: {
+        title: '🎭 AI 페르소나 인터뷰',
+        description:
+          '다양한 산업군의 고객 역할을 맡은 AI 에이전트와 인터뷰합니다. ' +
+          '실제 현업 요구사항 도출 과정을 시뮬레이션하여 기획서의 깊이를 높입니다.',
+        side: 'right',
+        align: 'start',
+      },
+    },
+    {
+      element: '#portfolio-originality-gauge',
+      popover: {
+        title: '🔬 독창성 점수 실시간 확인',
+        description:
+          '기획서를 작성하면 역대 수료생 프로젝트와 유사도를 실시간으로 비교합니다. ' +
+          '유사도 60% 미만이면 독창성 인증을 받을 수 있습니다.',
+        side: 'left',
+        align: 'center',
+      },
+    },
+  ],
+};
+
+// ── EWS 기능 투어 (Gemini 제언 ③) ──────────────────────────────────────────────
+// /admin 경로 최초 방문 시 admin 역할에게 자동 실행
+
+export const ewsTour: TourScenario = {
+  tourId: 'ews-tour',
+  roles: ['admin', 'instructor'],
+  entryPath: '/admin',
+  steps: [
+    {
+      element: '#admin-sidebar-ews',
+      popover: {
+        title: '🚨 EWS 위험 감지 대시보드',
+        description:
+          '출석률·과제 미제출·AI 튜터 활용률 등을 종합 분석해 중도탈락 위험 수강생을 ' +
+          '자동으로 감지합니다. 위험 수강생 클릭 시 상담 예약 또는 안부 메시지를 발송할 수 있습니다.',
+        side: 'right',
+        align: 'start',
+      },
+    },
+    {
+      element: '#admin-sidebar-thresholds',
+      popover: {
+        title: '🎚️ EWS 임계치 조정',
+        description:
+          '위험 판정 기준(60점 / 75점 / 90점)을 슬라이더로 직접 조정하세요. ' +
+          '강사가 "오탐"으로 표시한 피드백이 쌓일수록 임계치가 자동 보정됩니다.',
+        side: 'right',
+        align: 'start',
+      },
+    },
+    {
+      element: '#admin-sidebar-schedule',
+      popover: {
+        title: '⏰ Heartbeat 스케줄 설정',
+        description:
+          '매시간·매일·매주 실행할 EWS 분석 주기를 코드 없이 드롭다운으로 설정합니다. ' +
+          '변경 즉시 DB에 반영되며, 다음 주기부터 새 일정으로 자동 실행됩니다.',
+        side: 'right',
+        align: 'start',
+      },
+    },
+  ],
+};
+
+export const ALL_TOURS: TourScenario[] = [adminTour, studentTour, portfolioTour, ewsTour];
 
 /** 사용자 역할에 따라 실행할 투어 시나리오를 반환합니다. */
 export function getTourForRole(role: 'admin' | 'instructor' | 'student'): TourScenario | undefined {
