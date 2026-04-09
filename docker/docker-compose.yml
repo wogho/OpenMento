@@ -16,10 +16,14 @@ services:
       NODE_ENV: production
       PORT: "3000"
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars}
-      # BullMQ Webhook Worker용 Redis 연결 (Phase 2-5 개선 ①)
+      # BullMQ Webhook Worker + RAG Ingest Queue용 Redis 연결
       REDIS_URL: redis://redis:6379
+      # Phase 5-A: API 서버가 업로드 파일을 쓰는 공유 볼륨 경로
+      UPLOAD_TMP_DIR: /tmp/uploads
       # Heartbeat cron 스케줄러 타임존 고정 (KST)
       TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - uploads_tmp:/tmp/uploads
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
       interval: 15s
@@ -98,8 +102,37 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── RAG Worker (Phase 5-A: 임베딩 큐 소비 독립 프로세스) ──────
+  # API 서버에서 BullMQ 큐에 추가된 임베딩 Job을 소비합니다.
+  # - 파싱(CPU) + OpenAI 임베딩(Network) + DB 저장을 API 서버와 분리하여 처리
+  # - REDIS_URL 없는 환경: 이 서비스 미실행 시 API fallback(직접 호출)이 동작함
+  # - concurrency: RAG_WORKER_CONCURRENCY env로 조절 (기본: 2)
+  rag-worker:
+    build:
+      context: ..
+      dockerfile: packages/rag-worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-educlip_user}:${POSTGRES_PASSWORD:-educlip_pass}@db:5432/${POSTGRES_DB:-educlip_db}
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      UPLOAD_TMP_DIR: /tmp/uploads
+      RAG_WORKER_CONCURRENCY: ${RAG_WORKER_CONCURRENCY:-2}
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - uploads_tmp:/tmp/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   db_data:
     name: educlip_db_data
   redis_data:
     name: educlip_redis_data
+  uploads_tmp:
+    name: educlip_uploads_tmp

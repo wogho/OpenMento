@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
 import { ingestDocument } from '@educlip/rag';
+import { getRagIngestQueue } from '../queues/rag-ingest.queue.js';
 import {
   db,
   ragDocuments,
@@ -69,11 +70,14 @@ async function setSecrets(institutionId: string, secrets: AdminSecrets): Promise
   return setInstitutionSetting<AdminSecrets>(institutionId, SECRETS_KEY, secrets);
 }
 
-// multer: OS tmpdir 디스크 스토리지 — worker_threads 기반 ingestDocument()가 파일 경로를 요구함
-// (memoryStorage()는 req.file.path = undefined → pipeline에서 ENOENT 발생)
+// multer: 공유 볼륨 또는 OS tmpdir 디스크 스토리지
+// - UPLOAD_TMP_DIR env: Docker 공유 볼륨 경로(rag-worker와 공유)
+// - 미설정 시: os.tmpdir() — 로컬 개발 / REDIS_URL 없는 환경
+// worker_threads 기반 ingestDocument()가 파일 경로를 요구함 (memoryStorage() 사용 불가)
+const UPLOAD_TMP_DIR = process.env.UPLOAD_TMP_DIR ?? os.tmpdir();
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    destination: (_req, _file, cb) => cb(null, UPLOAD_TMP_DIR),
     filename: (_req, file, cb) => {
       const ext = extname(file.originalname);
       cb(null, `educlip-upload-${randomUUID()}${ext}`);
@@ -139,6 +143,11 @@ router.get('/documents', async (req, res) => {
 
 // POST /admin/documents — 교재 업로드 및 RAG 임베딩 등록
 // Content-Type: multipart/form-data, Body: file + courseId?(UUID)
+//
+// ── Phase 5-A 비동기 분리 전략 ──────────────────────────────────────────────
+//   REDIS_URL 있음 → BullMQ 큐에 Job 추가 → 202 Accepted (즉시 응답)
+//                    rag-worker 프로세스가 백그라운드에서 파싱+임베딩+DB 저장 수행
+//   REDIS_URL 없음 → 기존 직접 ingestDocument() 호출 → 201 Created (처리 완료 후 응답)
 router.post('/documents', upload.single('file'), async (req, res) => {
   const { institutionId } = req.user!;
 
@@ -149,20 +158,44 @@ router.post('/documents', upload.single('file'), async (req, res) => {
 
   const parsed = documentUploadSchema.safeParse(req.body);
   const courseId = parsed.success ? parsed.data.courseId : undefined;
+  const deliveryId = randomUUID();
 
-  await ingestDocument({
-    institutionId,
-    courseId,
-    fileName: req.file.originalname,
-    filePath: req.file.path, // OS tmpdir 물리 파일 경로 (diskStorage)
-  });
+  const ragQueue = getRagIngestQueue();
 
-  // DocItem 형식으로 응답 (id: 업로드 세션 UUID, UI 목록 즉시 반영용)
-  res.status(201).json({
-    id: randomUUID(),
-    filename: req.file.originalname,
-    createdAt: new Date().toISOString().split('T')[0],
-  });
+  if (ragQueue) {
+    // ── BullMQ 비동기 경로 (REDIS_URL 있을 때) ────────────────────────────
+    // rag-worker 컨테이너가 동일한 공유 볼륨(UPLOAD_TMP_DIR)을 마운트하고 있어야 합니다.
+    await ragQueue.add(
+      'ingest',
+      {
+        institutionId,
+        courseId,
+        fileName: req.file.originalname,
+        filePath: req.file.path, // 공유 볼륨 경로
+        deliveryId,
+      },
+      { jobId: deliveryId },
+    );
+    res.status(202).json({
+      status: 'queued',
+      jobId: deliveryId,
+      filename: req.file.originalname,
+      message: '임베딩 처리가 백그라운드에서 진행됩니다. 완료 후 문서 목록에 표시됩니다.',
+    });
+  } else {
+    // ── 직접 호출 fallback (REDIS_URL 없을 때) ────────────────────────────
+    await ingestDocument({
+      institutionId,
+      courseId,
+      fileName: req.file.originalname,
+      filePath: req.file.path,
+    });
+    res.status(201).json({
+      id: deliveryId,
+      filename: req.file.originalname,
+      createdAt: new Date().toISOString().split('T')[0],
+    });
+  }
 });
 
 // DELETE /admin/documents/:id — 소프트 삭제 (연결된 청크 전체)

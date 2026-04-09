@@ -928,3 +928,41 @@ github api
 - DB에 저장된 secrets를 `process.env`에 재적용 (서버 재시작 후 LLM 어댑터 즉시 사용 가능)
 
 **테스트 현황**: 161개 전체 통과 / tsc 오류 0개 (대상 파일 기준)
+
+### K. Phase 5-1 RAG 파이프라인 BullMQ 비동기 분리 ✅
+
+**배경**: Phase 1~4에서 RAG 임베딩은 `worker_threads`로 메인 스레드 블로킹을 방지했으나, 
+API 서버 프로세스 내에서 처리되어 수강생 50명 초과 시 서버 부하 급증 우려.
+Phase 5-A: BullMQ Queue + 독립 rag-worker 프로세스로 완전 분리.
+
+#### K-1. BullMQ RAG 임베딩 큐 신설
+- `server/src/queues/rag-ingest.job.ts` — Job 데이터 타입 (`institutionId, courseId, fileName, filePath, deliveryId`)
+- `server/src/queues/rag-ingest.queue.ts` — BullMQ Queue 팩토리
+  - REDIS_URL 없으면 null 반환 → admin.ts 직접 호출 fallback
+  - attempts: 3 / backoff: exponential 5s→10s→20s (OpenAI Rate Limit 대응)
+  - removeOnComplete: 200개, removeOnFail: 500개
+
+#### K-2. POST /admin/documents 비동기 전환
+- REDIS_URL 있음: BullMQ Job 추가 → 202 Accepted (즉시 응답)
+- REDIS_URL 없음: 기존 직접 `ingestDocument()` → 201 Created (처리 완료 후 응답)
+- `UPLOAD_TMP_DIR` env 지원 추가 (Docker 공유 볼륨 / 로컬 os.tmpdir() 모두 지원)
+
+#### K-3. `packages/rag-worker/` 독립 패키지 신설
+- BullMQ Worker 소비자 (`rag-ingest` 큐)
+- `ingestDocument()` 호출 → 내부적으로 worker_threads + OpenAI 임베딩 + DB 저장
+- 필수 환경변수 Fail-Fast 검증 (REDIS_URL, OPENAI_API_KEY)
+- `RAG_WORKER_CONCURRENCY` env로 병렬 처리 수 조절 (기본: 2)
+- 정상 종료: SIGTERM/SIGINT 수신 시 진행 중 Job 완료 대기 후 종료
+
+#### K-4. Docker Compose 업데이트
+- `rag-worker` 서비스 추가 (db + redis 헬스체크 후 기동)
+- `uploads_tmp` Named Volume 신설 — api + rag-worker 컨테이너가 공유
+- `api` 서비스에 `UPLOAD_TMP_DIR=/tmp/uploads` + `uploads_tmp` 볼륨 마운트 추가
+
+**단계적 전환 전략**:
+| 환경 | 동작 |
+|---|---|
+| REDIS_URL 없음 (로컬 개발) | 직접 `ingestDocument()` 호출 (기존 worker_threads 방식 유지) |
+| REDIS_URL 있음 (Docker/운영) | BullMQ Job → rag-worker 프로세스 비동기 처리 |
+
+**테스트 현황**: 161개 전체 통과 / tsc 오류 0개 (신규 파일 기준)

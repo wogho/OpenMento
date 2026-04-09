@@ -14,6 +14,7 @@ import { startWebhookWorker, closeWebhookWorker } from './queues/webhook.worker.
 import { initEwsThresholdsDb, loadEwsThresholdsFromDb } from './services/ews-thresholds.js';
 import { initInstitutionSettingsDb, loadAllInstitutionSettings, getInstitutionSetting } from './services/institution-settings-service.js';
 import { closeWebhookQueue } from './queues/webhook.queue.js';
+import { closeRagIngestQueue } from './queues/rag-ingest.queue.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
 
@@ -117,6 +118,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
   stopHeartbeatScheduler();
   await closeWebhookWorker();
   await closeWebhookQueue();
+  await closeRagIngestQueue();
   httpServer.close(() => process.exit(0));
 }
 
