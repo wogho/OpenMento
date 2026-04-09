@@ -563,9 +563,9 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 
 ### Phase 4 완료 기준 (Definition of Done)
 
-- [ ] 수강생이 인터뷰 → 기획서 → 피드백 → 독창성 인증까지 포털에서 완료 가능
-- [ ] 유사도 85% 이상 기획서에 자동 차별화 피드백 수신 확인
-- [ ] 관리자가 GUI에서 유사도 기준 슬라이더 조정 → 즉시 반영 확인
+- [x] 수강생이 인터뷰 → 기획서 → 피드백 → 독창성 인증까지 포털에서 완료 가능
+- [x] 유사도 85% 이상 기획서에 자동 차별화 피드백 수신 확인
+- [x] 관리자가 GUI에서 유사도 기준 슬라이더 조정 → 즉시 반영 확인
 
 ---
 
@@ -654,7 +654,7 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 | MCP 외부 시스템 연동 폼 | `POST /admin/connectors` | Phase 1 | - |
 | EWS 임계치 슬라이더 | `PUT /admin/thresholds` | Phase 2 | - |
 | 예산 숫자 입력 + 게이지 | `PUT /admin/budget` | Phase 2 | - |
-| 포트폴리오 유사도 슬라이더 | `PUT /admin/portfolio-settings` | Phase 4 | - |
+| 포트폴리오 유사도 슬라이더 | `PUT /admin/portfolio-settings` | Phase 4 | 완료 |
 | API 키 마스킹 보안 키 관리 | `PUT /admin/secrets` | Phase 1 | - |
 | 사용자 초대·엑셀 업로드 | `POST /admin/users/invite` | Phase 2 | - |
 | 교재 드래그앤드롭 업로드 | `POST /admin/documents` | Phase 1 | - |
