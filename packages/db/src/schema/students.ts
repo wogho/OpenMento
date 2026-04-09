@@ -39,6 +39,15 @@ export const students = pgTable('students', {
   index('students_deleted_at_idx').on(table.deletedAt),
   // Partial Index: 활성(미삭제) 수강생만 대상으로 조회 쫼리 향상
   // deleted_at IS NULL 행만 인덱스에 포함 → EWS / Heartbeat 스캔 시 N배 속도 개선
+  // ── 복합 인덱스 (Phase 5-2 ① 개선): RLS + 정렬/필터 플래너 최적화
+  // 기관별 등록 순 목록: WHERE institution_id = X AND deleted_at IS NULL ORDER BY enrolled_at DESC
+  index('students_institution_enrolled_idx')
+    .on(table.institutionId, table.enrolledAt)
+    .where(sql`${table.deletedAt} IS NULL`),
+  // 기관+과목 필터: WHERE institution_id = X AND course_id = Y AND deleted_at IS NULL
+  index('students_institution_course_idx')
+    .on(table.institutionId, table.courseId)
+    .where(sql`${table.deletedAt} IS NULL`),
   index('students_active_institution_idx')
     .on(table.institutionId)
     .where(sql`${table.deletedAt} IS NULL`),

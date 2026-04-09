@@ -18,6 +18,7 @@ import { initInstitutionSettingsDb, loadAllInstitutionSettings, getInstitutionSe
 import { closeWebhookQueue } from './queues/webhook.queue.js';
 import { closeRagIngestQueue } from './queues/rag-ingest.queue.js';
 import { startRagQueueEvents, closeRagQueueEvents } from './queues/rag-queue-events.js';
+import { rlsErrorHandler } from './utils/tenant-assert.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
 
@@ -65,6 +66,11 @@ app.use(BULL_BOARD_BASE_PATH, adminLimiter, createBullBoardRouter());
 app.use((_req, res) => {
   res.status(404).json({ error: '존재하지 않는 엔드포인트입니다.' });
 });
+
+// ── RLS NotFound 에러 핸들러 (Phase 5-2 ③) ───────────────
+// RlsNotFoundError 를 클라이언트에게 안전한 404 로 변환합니다.
+// 서버 사이드 로그에는 RLS 컨텍스트 정보가 기록됩니다.
+app.use(rlsErrorHandler);
 
 // ── 전역 에러 핸들러 ─────────────────────────────────────
 // multer 파일 크기 초과, 파일 형식 오류, 기타 uncaught 에러 처리

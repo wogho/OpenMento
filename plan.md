@@ -1092,3 +1092,84 @@ interface RagProgressEvent {
 ---
 
 **테스트 현황**: 185개 전체 통과 (Phase 5-2 신규 24개 포함)
+
+---
+
+## 부록 N. Phase 5-2 개선 반영 이력 (2026-04-09)
+
+> Phase 5-2 완료 후 3가지 아키텍처 피드백을 즉시 반영하였습니다.
+> 225개 전체 Vitest 테스트 통과 / tsc 오류 0개.
+
+---
+
+### N-1. 복합 인덱스(Composite Index) 추가 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | RLS 정책이 모든 쿼리에 `WHERE institution_id = X`를 자동 삽입하지만, 단일 컬럼 FK 인덱스만 존재하여 RLS + 추가 필터(`created_at DESC`, `status`, `action`) 복합 조건에서 Table Full Scan 위험 |
+| **해결** | 마이그레이션 `0010_rls_composite_indexes.sql` 생성 — 4개 핵심 테이블에 `CONCURRENTLY` 방식으로 복합 인덱스 추가 |
+| **버그 수정** | `ews_risk_scores`에 `institution_id` 컬럼이 없는 상태에서 `0009` RLS 정책이 해당 컬럼을 직접 참조하는 불일치 수정 — `ALTER TABLE ... ADD COLUMN IF NOT EXISTS institution_id`, 데이터 백필 UPDATE, RLS 정책 재생성 |
+
+**추가된 인덱스 목록**:
+| 테이블 | 인덱스 이름 | 컬럼 조합 | 용도 |
+|---|---|---|---|
+| `heartbeat_runs` | `heartbeat_runs_institution_created_idx` | `(institution_id, created_at DESC)` | 기관별 최신 실행 이력 |
+| `heartbeat_runs` | `heartbeat_runs_institution_status_idx` | `(institution_id, status)` | 기관별 상태 필터 |
+| `heartbeat_runs` | `heartbeat_runs_institution_active_idx` | `(institution_id, created_at DESC) WHERE status IN (...)` | 실행 중/대기 중 Job |
+| `audit_logs` | `audit_logs_institution_created_idx` | `(institution_id, created_at DESC)` | 기관별 최근 감사 로그 |
+| `audit_logs` | `audit_logs_institution_action_idx` | `(institution_id, action)` | 액션 유형별 필터 |
+| `audit_logs` | `audit_logs_institution_actor_idx` | `(institution_id, actor_id)` | 행위자 추적 |
+| `ews_risk_scores` | `ews_risk_scores_institution_score_idx` | `(institution_id, total_score DESC)` | 고위험 수강생 목록 |
+| `ews_risk_scores` | `ews_risk_scores_student_calculated_idx` | `(student_id, calculated_at DESC)` | 수강생 최신 점수 |
+| `students` | `students_institution_enrolled_idx` | `(institution_id, enrolled_at DESC) WHERE deleted_at IS NULL` | 기관별 등록순 목록 |
+| `students` | `students_institution_course_idx` | `(institution_id, course_id) WHERE deleted_at IS NULL` | 기관+과목 필터 |
+
+**수정 파일**: `packages/db/drizzle/0010_rls_composite_indexes.sql`, `packages/db/src/schema/ews_risk_scores.ts`, `heartbeat_runs.ts`, `audit_logs.ts`, `students.ts`
+
+---
+
+### N-2. ESLint 커스텀 룰 + Tenant Repository 계층 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | 개발자가 실수로 `withTenantContext()`로 감싸지 않고 `db`를 직접 route 파일에서 호출할 경우, `app.institution_id` 미설정으로 RLS가 빈 결과 또는 에러 반환 |
+| **해결①** | `tools/eslint-rules/no-direct-db-in-routes.js` ESLint 커스텀 룰 — `routes/` 파일에서 `db` 직접 import/메서드 호출 금지, `withTenantContext()` 래퍼 내부는 허용 |
+| **해결②** | `server/src/repositories/tenant-repository.ts` — 모든 DB 접근이 반드시 `withTenantContext`를 통하도록 강제하는 Repository 기반 계층 |
+| **예외 처리** | `repositories/`, `services/`, `middleware/`, `__tests__/` 경로는 허용. `super-admin.ts`는 명시적 패턴으로 예외 허용 |
+
+**추가 룰 구성** (`.eslintrc.json`):
+```json
+"local-rules/no-direct-db-in-routes": ["error", {
+  "forbiddenSymbols": ["db"],
+  "allowedPathPatterns": ["/repositories/", "/services/", "/middleware/", "/__tests__/"]
+}]
+```
+
+**신규 파일**: `tools/eslint-rules/no-direct-db-in-routes.js`, `tools/eslint-rules/index.js`, `server/src/repositories/tenant-repository.ts`  
+**수정 파일**: `.eslintrc.json`
+
+---
+
+### N-3. RLS 404/403 구조적 로깅 유틸리티 ✅
+
+| 항목 | 내용 |
+|---|---|
+| **문제** | RLS 적용 시 크로스 테넌트 접근(403 의도)이 "데이터 없음(404)"으로 반환되어 운영 디버깅이 어려움 |
+| **보안 원칙** | 클라이언트에게는 항상 404만 반환(B가 존재한다는 사실 자체를 숨김) — 변경 없음 |
+| **해결** | `server/src/utils/tenant-assert.ts` 생성 — `assertTenantExists()`, `warnIfRlsEmpty()`, `rlsErrorHandler()` |
+
+**동작 흐름**:
+```
+assertTenantExists(row, { resourceType, resourceId, institutionId, req })
+  ├─ row != null  → 통과 (no-op)
+  └─ row == null  → console.warn({ event: 'RLS_NOT_FOUND', resourceType, institutionId, method, path })
+                    throw RlsNotFoundError (statusCode: 404, message: "{type} not found")
+                    클라이언트: 404 JSON { error: "..." } (기관 ID 미포함)
+```
+
+**신규 파일**: `server/src/utils/tenant-assert.ts`  
+**수정 파일**: `server/src/index.ts` (`rlsErrorHandler` 전역 에러 핸들러 앞단에 등록)
+
+---
+
+**테스트 현황**: **225개 전체 통과** (Phase 5-2 개선 신규 40개 포함) / tsc 오류 0개

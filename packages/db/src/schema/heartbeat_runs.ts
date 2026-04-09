@@ -49,6 +49,11 @@ export const heartbeatRuns = pgTable('heartbeat_runs', {
   index('heartbeat_runs_agent_id_idx').on(table.agentId),
   // 대시보드 최근 실행 조회 인덱스
   index('heartbeat_runs_created_at_idx').on(table.createdAt),
+  // ── 복합 인덱스 (Phase 5-2 ① 개선): RLS + 추가 필터 플래너 최적화
+  // 기관별 최신 실행 이력: WHERE institution_id = X ORDER BY created_at DESC
+  index('heartbeat_runs_institution_created_idx').on(table.institutionId, table.createdAt),
+  // 기관별 상태 필터: WHERE institution_id = X AND status = 'running'
+  index('heartbeat_runs_institution_status_idx').on(table.institutionId, table.status),
 ]);
 
 export const heartbeatRunsRelations = relations(heartbeatRuns, ({ one }) => ({

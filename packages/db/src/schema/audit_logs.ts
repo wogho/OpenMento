@@ -41,6 +41,13 @@ export const auditLogs = pgTable('audit_logs', {
   index('audit_logs_actor_id_idx').on(table.actorId),
   // 시간 범위 쿼리 인덱스 (보안 감사 기간 필터링)
   index('audit_logs_created_at_idx').on(table.createdAt),
+  // ── 복합 인덱스 (Phase 5-2 ① 개선): RLS + 보안감사 필터 플래너 최적화
+  // 기관별 최근 감사 로그: WHERE institution_id = X ORDER BY created_at DESC
+  index('audit_logs_institution_created_idx').on(table.institutionId, table.createdAt),
+  // 기관+액션 필터: WHERE institution_id = X AND action = 'agent_run'
+  index('audit_logs_institution_action_idx').on(table.institutionId, table.action),
+  // 기관+행위자 추적: WHERE institution_id = X AND actor_id = Y
+  index('audit_logs_institution_actor_idx').on(table.institutionId, table.actorId),
 ]);
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
