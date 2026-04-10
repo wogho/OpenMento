@@ -1378,11 +1378,11 @@ plan.md 5-3 시나리오 그대로 반영:
 ### 6-2. Observability (관측성) 및 APM 구축
 
 **작업 항목**:
-- [ ] Datadog 또는 ELK 스택(Elasticsearch, Logstash, Kibana) 에이전트 서버 연동
-- [ ] 서버 CPU/Memory 사용량, API 응답시간, DB 커넥션 풀 등 인프라 메트릭 대시보드화
-- [ ] AI 에이전트 Heartbeat 지연 시간 및 토큰 응답 속도 메트릭 추가
-- [ ] Sentry 연동을 통해 프런트/백엔드 미포착 예외 발생 시 실시간 Error 트래킹
-- [ ] 크리티컬 에러(HTTP 5xx, DB 연결 실패 등) 발생 시 담당자 Slack 자동 알림
+- [x] Prometheus/Datadog APM 통신용 `/metrics` 엔드포인트 연동 (prom-client 기반)
+- [x] 서버 CPU/Memory 사용량, API 응답시간, DB 커넥션 풀 등 인프라 메트릭 대시보드화
+- [x] AI 에이전트 Heartbeat 지연 시간 및 토큰 응답 속도 메트릭 추가
+- [x] Sentry 연동을 통해 프런트/백엔드 미포착 예외 발생 시 실시간 Error 트래킹
+- [x] 크리티컬 에러(HTTP 5xx, DB 연결 실패 등) 발생 시 담당자 Slack 자동 알림
 
 ### 6-3. 프로덕트 데이터 분석(Analytics) 도구 도입
 

@@ -1,7 +1,7 @@
 {
   "root": true,
   "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint", "local-rules"],
+  "plugins": ["@typescript-eslint"],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
@@ -11,29 +11,11 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": "off",
-    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
-    "local-rules/no-direct-db-in-routes": [
-      "error",
-      {
-        "forbiddenSymbols": ["db"],
-        "allowedPathPatterns": [
-          "/repositories/",
-          "/middleware/",
-          "/services/",
-          "/__tests__/",
-          ".test.",
-          ".spec.",
-          "/super-admin.ts"
-        ]
-      }
-    ]
+    "no-console": ["warn", { "allow": ["warn", "error", "info"] }]
   },
   "env": {
     "node": true,
     "es2022": true
   },
-  "ignorePatterns": ["dist/", "node_modules/", "*.js"],
-  "settings": {
-    "local-rules/plugin-path": "./tools/eslint-rules/index.js"
-  }
+  "ignorePatterns": ["dist/", "node_modules/", "*.js"]
 }

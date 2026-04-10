@@ -318,3 +318,60 @@ export async function sendSlackTestMessage(webhookUrl: string): Promise<void> {
     ],
   });
 }
+
+export async function sendSystemErrorToSlack(
+  webhookUrl: string,
+  error: Error,
+  context?: Record<string, any>
+): Promise<void> {
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: '🚨 [EduClip] System Critical Error' },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Error Message:*\n\`${error.message}\``,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Stack Trace:*\n\`\`\`${error.stack?.slice(0, 1000) || 'No stack trace'}\`\`\``,
+      },
+    },
+  ];
+
+  if (context) {
+    blocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `*Context:* ${JSON.stringify(context)}`,
+        },
+      ],
+    });
+  }
+
+  const payload = {
+    text: 'System Critical Error',
+    blocks,
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      console.error(`Failed to send slack alert. Status: ${response.status}`);
+    }
+  } catch (err) {
+    console.error('Network error sending slack alert:', err);
+  }
+}

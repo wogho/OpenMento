@@ -4,6 +4,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
+import * as Sentry from '@sentry/react';
+
+// ── Sentry APM 셋업 (Phase 6-2) ──────────────────────────────
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN || 'https://public@sentry.example.com/2',
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -23,14 +23,52 @@ import { rlsErrorHandler } from './utils/tenant-assert.js';
 import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
 import { securityHeaders } from './middleware/security-headers.js';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import { getMetrics, requestCounter, apiResponseTimeHistogram } from './utils/metrics.js';
+import { sendSystemErrorToSlack } from './services/slack-notifier.js';
 
 const app = express();
+
+// ── Sentry APM 셋업 (Phase 6-2) ──────────────────────────────
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || 'https://public@sentry.example.com/1', // 기본값은 실제 운영 환경에 맞춰 변경
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  tracesSampleRate: 1.0, 
+  profilesSampleRate: 1.0,
+});
+
 const httpServer = createServer(app);
+
+// ── HTTP Metrics Middleware (Phase 6-2) ──────────────────────
+app.use((req, res, next) => {
+  const start = process.hrtime();
+  res.on('finish', () => {
+    const diff = process.hrtime(start);
+    const time = diff[0] + diff[1] / 1e9;
+    const route = req.route ? req.route.path : req.path;
+    requestCounter.inc({ method: req.method, route, status_code: res.statusCode });
+    apiResponseTimeHistogram.observe({ method: req.method, route, status_code: res.statusCode }, time);
+  });
+  next();
+});
 
 // ── OWASP A05 보안 헤더 (Phase 5-5) — 모든 라우트 앞에 적용 ─────────────────
 app.use(securityHeaders);
 
 app.use(express.json());
+
+// ── Prometheus Metrics Endpoint (Phase 6-2) ────────────────────────
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', 'text/plain');
+    res.end(await getMetrics());
+  } catch (err) {
+    res.status(500).end(String(err));
+  }
+});
 
 // ── GitHub Webhook: raw Buffer 파싱 (HMAC 서명 검증에 원본 바이트 필요) ──────
 // express.json() 적용 전에 등록해야 충돌 없음
@@ -79,10 +117,13 @@ app.use((_req, res) => {
 // 서버 사이드 로그에는 RLS 컨텍스트 정보가 기록됩니다.
 app.use(rlsErrorHandler);
 
+// ── Sentry Error Handler (Phase 6-2) ─────────────────────
+Sentry.setupExpressErrorHandler(app);
+
 // ── 전역 에러 핸들러 ─────────────────────────────────────
 // multer 파일 크기 초과, 파일 형식 오류, 기타 uncaught 에러 처리
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       res.status(413).json({ error: '파일 크기가 50MB를 초과합니다.' });
@@ -99,6 +140,12 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   logger.error({ err }, '[server] 처리되지 않은 오류');
+  
+  const slackUrl = process.env.SLACK_WEBHOOK_URL?.trim();
+  if (slackUrl) {
+    sendSystemErrorToSlack(slackUrl, err, { route: req.path, method: req.method }).catch(() => {});
+  }
+  
   res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
 });
 
