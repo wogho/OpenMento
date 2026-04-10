@@ -42,6 +42,24 @@ EduClip은 AI 에이전트 팀을 조직하여 교육 기관의 운영 전반을
 
 <br/>
 
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><strong>연동<br/>가능</strong></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/anthropic/000000" width="32" alt="Claude" /><br/><sub>Claude</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/openai/000000" width="32" alt="GPT" /><br/><sub>GPT-4o</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/google/4285F4" width="32" alt="Gemini" /><br/><sub>Gemini</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/ollama/000000" width="32" alt="Ollama" /><br/><sub>Ollama</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/curl/073551" width="32" alt="HTTP" /><br/><sub>HTTP API</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/jsonwebtokens/000000" width="32" alt="MCP" /><br/><sub>MCP</sub></td>
+  </tr>
+</table>
+
+<em>하트비트를 수신할 수 있다면, 어떤 에이전트든 배치 가능합니다.</em>
+</div>
+
+<br/>
+
 ## EduClip이 적합한 경우
 
 - AI 에이전트로 구성된 **자율 교육 기관**을 구축하려는 경우
