@@ -33,7 +33,7 @@ import {
   and,
   sql,
   desc,
-} from '@educlip/db';
+} from '@openmento/db';
 import { getPersonaById, PERSONA_TEMPLATES } from './persona-prompts.js';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';

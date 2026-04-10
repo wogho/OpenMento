@@ -6,7 +6,7 @@
  * ── 역할 ──────────────────────────────────────────────────────────────────────
  *
  *   API 서버(POST /admin/documents)가 BullMQ 큐에 추가한 임베딩 Job을 소비합니다.
- *   `ingestDocument()` (@educlip/rag)를 호출하여:
+ *   `ingestDocument()` (@openmento/rag)를 호출하여:
  *     1. OS 공유 볼륨에서 파일 읽기
  *     2. worker_threads 내에서 파싱 + 청킹 (CPU-bound)
  *     3. OpenAI 임베딩 생성 (Network I/O, 지수 백오프)
@@ -31,7 +31,7 @@
 import { Worker, UnrecoverableError } from 'bullmq';
 import pino from 'pino';
 import { createServer } from 'node:http';
-import { ingestDocument } from '@educlip/rag';
+import { ingestDocument } from '@openmento/rag';
 
 const logger = pino({
   name: 'rag-worker',

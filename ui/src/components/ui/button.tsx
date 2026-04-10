@@ -45,7 +45,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button"
     
     // Apply Framer Motion micro-interaction haptic feedback globally
-    const MotionComp = motion.create(Comp) as any;
+    const MotionComp = motion.create(Comp) as React.ElementType;
 
     return (
       <MotionComp

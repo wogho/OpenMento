@@ -41,7 +41,7 @@ import {
   eq,
   and,
   isNull,
-} from '@educlip/db';
+} from '@openmento/db';
 import { triggerAgentManually } from '../services/heartbeat.js';
 import {
   generateCodeReview,

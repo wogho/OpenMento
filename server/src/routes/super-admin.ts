@@ -31,7 +31,7 @@ import {
   and,
   sql,
   desc,
-} from '@educlip/db';
+} from '@openmento/db';
 
 const router: ReturnType<typeof Router> = Router();
 

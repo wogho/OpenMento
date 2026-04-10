@@ -10,7 +10,7 @@ services:
       - ../packages:/app/packages:cached
     environment:
       NODE_ENV: development
-    command: ["pnpm", "--filter", "@educlip/server", "dev"]
+    command: ["pnpm", "--filter", "@openmento/server", "dev"]
 
   ui:
     build:
@@ -24,7 +24,7 @@ services:
       - ../ui/index.html:/app/ui/index.html:cached
     environment:
       NODE_ENV: development
-    command: ["pnpm", "--filter", "@educlip/ui", "dev", "--host", "0.0.0.0"]
+    command: ["pnpm", "--filter", "@openmento/ui", "dev", "--host", "0.0.0.0"]
 
   mcp-gateway:
     build:
@@ -32,4 +32,4 @@ services:
     environment:
       NODE_ENV: development
       PORT: "3001"
-    command: ["pnpm", "--filter", "@educlip/server", "tsx", "watch", "src/mcp/gateway.ts"]
+    command: ["pnpm", "--filter", "@openmento/server", "tsx", "watch", "src/mcp/gateway.ts"]

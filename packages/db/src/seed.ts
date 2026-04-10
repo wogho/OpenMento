@@ -1,6 +1,6 @@
 /**
- * EduClip 개발용 시드 데이터 스크립트
- * 실행: pnpm --filter @educlip/db db:seed
+ * OpenMento 개발용 시드 데이터 스크립트
+ * 실행: pnpm --filter @openmento/db db:seed
  *
  * 생성 데이터:
  *  - 교육기관 1개 (테스트 교육기관)
@@ -10,6 +10,7 @@
  *  - 스케줄 루틴 3개 (매시간, 매일, 매주)
  *  - 예산 정책 1개
  */
+/* eslint-disable no-console */
 
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';

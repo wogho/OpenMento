@@ -14,8 +14,8 @@
  *  ews-monitor.ts (classifyRiskLevel) ◄─┘
  */
 
-import type { Db } from '@educlip/db';
-import { ewsSettings } from '@educlip/db/schema';
+import type { Db } from '@openmento/db';
+import { ewsSettings } from '@openmento/db/schema';
 
 export interface EwsThresholds {
   /** 위험 판정 기준 (warning, 기본 60) */

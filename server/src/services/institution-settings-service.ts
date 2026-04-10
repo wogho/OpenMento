@@ -8,9 +8,9 @@
  *   - DB 접근 불가 시 기본값 폴백으로 서버 기동 중단 없이 동작
  */
 
-import type { Db } from '@educlip/db';
-import { institutionSettings } from '@educlip/db/schema';
-import { and, eq } from '@educlip/db';
+import type { Db } from '@openmento/db';
+import { institutionSettings } from '@openmento/db/schema';
+import { and, eq } from '@openmento/db';
 
 // ── 인메모리 캐시 ────────────────────────────────────────────────────────────
 // key: `${institutionId}:${settingKey}`

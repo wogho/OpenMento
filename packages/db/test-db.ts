@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-const sql = postgres('postgresql://educlip_user:educlip_pass@127.0.0.1:5432/educlip_db');
+const sql = postgres('postgresql://openmento_user:openmento_pass@127.0.0.1:5432/openmento_db');
 async function test() {
   try {
     const res = await sql`SELECT 1 + 1 AS result`;

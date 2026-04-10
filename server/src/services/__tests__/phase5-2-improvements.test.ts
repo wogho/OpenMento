@@ -87,7 +87,7 @@ describe('① 복합 인덱스 마이그레이션 (0010)', () => {
 
 describe('① ews_risk_scores 스키마 — institutionId 컬럼 추가', () => {
   it('institutionId 컬럼이 스키마에 정의되어야 한다', async () => {
-    const { ewsRiskScores } = await import('@educlip/db');
+    const { ewsRiskScores } = await import('@openmento/db');
     const columns = Object.keys(ewsRiskScores);
     expect(columns).toContain('institutionId');
   });
@@ -141,7 +141,7 @@ describe('② ESLint 룰 — no-direct-db-in-routes', () => {
 
   it('ImportDeclaration 핸들러가 있어야 한다 (import 탐지)', () => {
     expect(ruleSource).toContain('ImportDeclaration');
-    expect(ruleSource).toContain('@educlip/db');
+    expect(ruleSource).toContain('@openmento/db');
   });
 
   it('CallExpression 핸들러가 있어야 한다 (메서드 호출 탐지)', () => {

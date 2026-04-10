@@ -17,15 +17,15 @@
  */
 
 import { createHash } from 'node:crypto';
-import { eq, and, isNull, isNotNull, lt, sql } from '@educlip/db';
+import { eq, and, isNull, isNotNull, lt, sql } from '@openmento/db';
 import {
   db,
   agents,
   heartbeatRuns,
   routines,
   routineTriggers,
-} from '@educlip/db';
-import type { Agent, NewHeartbeatRun } from '@educlip/db';
+} from '@openmento/db';
+import type { Agent, NewHeartbeatRun } from '@openmento/db';
 import { matchesCron, parseCron } from './cron.js';
 import { issueAgentToken } from './agent-auth-jwt.js';
 import { runEwsMonitor } from './ews-monitor.js';
@@ -82,7 +82,7 @@ let currentConcurrentRuns = 0;
  */
 function advisoryLockKeys(agentId: string, minuteBucket: string): [string, string] {
   const hash = createHash('sha256')
-    .update(`educlip:heartbeat:${agentId}:${minuteBucket}`)
+    .update(`openmento:heartbeat:${agentId}:${minuteBucket}`)
     .digest();
   return [
     String(hash.readInt32BE(0)),

@@ -53,7 +53,7 @@ interface ChatState {
   clearSession: () => void;
 }
 
-const SESSION_KEY = 'educlip_chat_session';
+const SESSION_KEY = 'openmento_chat_session';
 
 export const useChatStore = create<ChatState>((set) => ({
   // ── 초기 상태 ──

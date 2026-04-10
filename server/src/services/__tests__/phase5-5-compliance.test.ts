@@ -62,8 +62,8 @@ const mockDb = {
   transaction: vi.fn(),
 };
 
-vi.mock('@educlip/db', async () => {
-  const actual = await vi.importActual<typeof import('@educlip/db')>('@educlip/db');
+vi.mock('@openmento/db', async () => {
+  const actual = await vi.importActual<typeof import('@openmento/db')>('@openmento/db');
   return {
     ...actual,
     db: mockDb,

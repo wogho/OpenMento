@@ -23,8 +23,8 @@ import {
   isNull,
   and,
   sql,
-} from '@educlip/db';
-import { embedText, embedBatch } from '@educlip/rag';
+} from '@openmento/db';
+import { embedText, embedBatch } from '@openmento/rag';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { LlmMessage } from '../adapters/index.js';
 

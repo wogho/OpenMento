@@ -1,13 +1,13 @@
 # Docker 가이드
 
-Node나 pnpm을 로컬에 설치하지 않고 Docker로 EduClip을 실행합니다.
+Node나 pnpm을 로컬에 설치하지 않고 Docker로 OpenMento을 실행합니다.
 
 모든 명령어는 **프로젝트 루트** (`package.json`이 있는 디렉터리)에서 실행합니다.
 
 ## 이미지 빌드
 
 ```sh
-docker build -t educlip-local .
+docker build -t openmento-local .
 ```
 
 빌드 인수:
@@ -18,21 +18,21 @@ docker build -t educlip-local .
 | `USER_GID` | `1000` | 컨테이너 node 그룹 GID |
 
 ```sh
-docker build -t educlip-local \
+docker build -t openmento-local \
   --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) .
 ```
 
 ## 원클릭 (빌드 + 실행)
 
 ```sh
-docker build -t educlip-local . && \
-docker run --name educlip \
+docker build -t openmento-local . && \
+docker run --name openmento \
   -p 3100:3100 \
   -e HOST=0.0.0.0 \
-  -e EDUCLIP_HOME=/educlip \
+  -e OPENMENTO_HOME=/openmento \
   -e BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
-  -v "$(pwd)/data/docker-educlip:/educlip" \
-  educlip-local
+  -v "$(pwd)/data/docker-openmento:/openmento" \
+  openmento-local
 ```
 
 열기: `http://localhost:3100`
@@ -66,10 +66,10 @@ docker compose up --build
 
 이렇게 하면 다음이 시작됩니다:
 
-- `educlip-api`: Node.js API 서버 (포트 3100)
-- `educlip-db`: PostgreSQL 16 + pgvector (포트 5432)
-- `educlip-worker`: BullMQ RAG 임베딩 워커
-- `educlip-redis`: BullMQ 브로커 (포트 6379)
+- `openmento-api`: Node.js API 서버 (포트 3100)
+- `openmento-db`: PostgreSQL 16 + pgvector (포트 5432)
+- `openmento-worker`: BullMQ RAG 임베딩 워커
+- `openmento-redis`: BullMQ 브로커 (포트 6379)
 
 ### pnpm Docker 명령어
 
@@ -87,7 +87,7 @@ pnpm docker:reset   # 볼륨 포함 완전 초기화 (데이터 삭제)
 ```yaml
 # docker-compose.yml 일부
 volumes:
-  - educlip-data:/educlip
+  - openmento-data:/openmento
   - pgdata:/var/lib/postgresql/data
 ```
 

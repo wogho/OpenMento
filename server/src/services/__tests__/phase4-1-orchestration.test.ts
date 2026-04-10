@@ -46,8 +46,8 @@ import {
 
 // ── DB & 외부 서비스 Mock ─────────────────────────────────────────────────────
 
-vi.mock('@educlip/db', async () => {
-  const actual = await vi.importActual<typeof import('@educlip/db')>('@educlip/db');
+vi.mock('@openmento/db', async () => {
+  const actual = await vi.importActual<typeof import('@openmento/db')>('@openmento/db');
   return {
     ...actual,
     db: {
@@ -183,7 +183,7 @@ describe('[Orc] startPortfolioWorkflow — 워크플로우 생성', () => {
   const goalId = 'goal-uuid-0001';
 
   beforeEach(async () => {
-    const { db } = await import('@educlip/db');
+    const { db } = await import('@openmento/db');
 
     // portfolio_projects insert → project id 반환
     // goals insert → goal id 반환
@@ -291,7 +291,7 @@ describe('[Orc] startPortfolioWorkflow — 워크플로우 생성', () => {
 
 describe('[Loop] 무한 루프 방지 — maxIterations 초과', () => {
   it('Loop① currentIteration >= maxIterations 시 false를 반환합니다 (내부 헬퍼 검증)', async () => {
-    const { db } = await import('@educlip/db');
+    const { db } = await import('@openmento/db');
 
     // iteration이 maxIterations에 도달한 goal 반환
     vi.mocked(db.select).mockReturnValue({
@@ -372,7 +372,7 @@ describe('[Loop] 무한 루프 방지 — maxIterations 초과', () => {
 
 describe('[Get] getWorkflowState — 상태 조회', () => {
   it('Get② 존재하지 않는 goalId에 statusCode 404 에러를 반환합니다', async () => {
-    const { db } = await import('@educlip/db');
+    const { db } = await import('@openmento/db');
 
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -392,7 +392,7 @@ describe('[Get] getWorkflowState — 상태 조회', () => {
   });
 
   it('Get① getWorkflowState는 goalId로 현재 상태를 반환합니다', async () => {
-    const { db } = await import('@educlip/db');
+    const { db } = await import('@openmento/db');
 
     let selectCallCount = 0;
     vi.mocked(db.select).mockImplementation(() => ({

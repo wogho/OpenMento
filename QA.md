@@ -1,4 +1,4 @@
-# EduClip — 출시 전 통합 QA 및 디버깅 보고서 (Pre-Release QA Report)
+# OpenMento — 출시 전 통합 QA 및 디버깅 보고서 (Pre-Release QA Report)
 
 > **작성일**: 2026년 4월 10일  
 > **검증 범위**: Phase 0 (기초 설계)부터 Phase 7 (Hi-Fi UI/UX)까지의 전체 시스템  
@@ -23,10 +23,10 @@
 
 | 검증 항목 | 대상 모듈 | 디버깅 결과 | 비고 (세부 내용) |
 |---|---|---|---|
-| **컴파일 및 빌드 (Build)** | `@educlip/ui`, `@educlip/server` | **✅ Pass** | UI Vite 빌드(10초) 및 Server tsc 컴파일 정상 통과. (단, 1,200 kB 초과 Large Chunk 경고 존재 — Vite rollup 기준) |
-| **타입 검증 (Typecheck)** | `@educlip/ui`, `@educlip/server` | **✅ 0 Errors** | 전 구간 `tsc --noEmit` 통과. Any Type 사용 컨벤션 외에 구조적 런타임 오류 없음. |
-| **서버 테스트 (Vitest)** | `@educlip/server` | **✅ 429/429 Pass** | 14개 테스트 파일, 429개 전수 검증 통과 완료 (소요시간 2.91s). 에이전트 Fallback, 서킷브레이커, 라우팅 검증 포함. |
-| **접근성 & a11y (Phase 7)** | `@educlip/ui` | **✅ Pass** | W3C 권고안에 따른 `aria-live`, `role="alert"` 속성 및 Screen Reader 텍스트 적용 확인 완료. |
+| **컴파일 및 빌드 (Build)** | `@openmento/ui`, `@openmento/server` | **✅ Pass** | UI Vite 빌드(10초) 및 Server tsc 컴파일 정상 통과. (단, 1,200 kB 초과 Large Chunk 경고 존재 — Vite rollup 기준) |
+| **타입 검증 (Typecheck)** | `@openmento/ui`, `@openmento/server` | **✅ 0 Errors** | 전 구간 `tsc --noEmit` 통과. Any Type 사용 컨벤션 외에 구조적 런타임 오류 없음. |
+| **서버 테스트 (Vitest)** | `@openmento/server` | **✅ 429/429 Pass** | 14개 테스트 파일, 429개 전수 검증 통과 완료 (소요시간 2.91s). 에이전트 Fallback, 서킷브레이커, 라우팅 검증 포함. |
+| **접근성 & a11y (Phase 7)** | `@openmento/ui` | **✅ Pass** | W3C 권고안에 따른 `aria-live`, `role="alert"` 속성 및 Screen Reader 텍스트 적용 확인 완료. |
 | **코드 품질 (ESLint)** | `전체 소스코드` | **✅ 0 Errors** | 수정 전 25건 에러 → 전원 해소. UI 1건 + Server 18건의 `no-explicit-any`/`no-console` 경고(warnings)만 잔존. 런타임 영향도 없음. |
 
 ---

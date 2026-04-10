@@ -68,7 +68,7 @@ pnpm docker:up
 | `USER_GID` | `1000` | 컨테이너 node 그룹 GID |
 
 ```sh
-docker build -t educlip-local \
+docker build -t openmento-local \
   --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) .
 ```
 
@@ -106,7 +106,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 임베딩 워커는 BullMQ 기반으로 독립 실행됩니다:
 
 ```sh
-pnpm --filter @educlip/rag-worker dev
+pnpm --filter @openmento/rag-worker dev
 ```
 
 ## 배포 모드

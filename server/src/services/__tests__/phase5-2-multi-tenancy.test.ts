@@ -59,8 +59,8 @@ const mockDb = {
   update: vi.fn(),
 };
 
-vi.mock('@educlip/db', async () => {
-  const actual = await vi.importActual<typeof import('@educlip/db')>('@educlip/db');
+vi.mock('@openmento/db', async () => {
+  const actual = await vi.importActual<typeof import('@openmento/db')>('@openmento/db');
 
   // withTenantContext: 실제 구현을 mockDb.transaction 기반으로 재현
   const withTenantContext = async <T>(
@@ -222,7 +222,7 @@ describe('[W] withTenantContext RLS 헬퍼', () => {
   });
 
   it('W①  트랜잭션 내에서 SET LOCAL app.institution_id를 실행합니다', async () => {
-    const { withTenantContext } = await import('@educlip/db');
+    const { withTenantContext } = await import('@openmento/db');
     const INST = '33333333-3333-3333-3333-333333333333';
 
     await withTenantContext(INST, async (_tx) => 'ok');
@@ -235,13 +235,13 @@ describe('[W] withTenantContext RLS 헬퍼', () => {
   });
 
   it('W②  콜백의 반환값을 그대로 반환합니다', async () => {
-    const { withTenantContext } = await import('@educlip/db');
+    const { withTenantContext } = await import('@openmento/db');
     const result = await withTenantContext('super', async (_tx) => ({ data: 42 }));
     expect(result).toEqual({ data: 42 });
   });
 
   it('W③  콜백에서 예외 발생 시 트랜잭션 롤백 (transaction 예외 재전파)', async () => {
-    const { withTenantContext } = await import('@educlip/db');
+    const { withTenantContext } = await import('@openmento/db');
     mockDb.transaction.mockRejectedValueOnce(new Error('DB error'));
 
     await expect(

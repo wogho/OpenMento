@@ -69,10 +69,10 @@ importers:
 
   packages/rag:
     dependencies:
-      '@educlip/db':
+      '@openmento/db':
         specifier: workspace:*
         version: link:../db
-      '@educlip/shared':
+      '@openmento/shared':
         specifier: workspace:*
         version: link:../shared
       openai:
@@ -91,10 +91,10 @@ importers:
 
   packages/rag-worker:
     dependencies:
-      '@educlip/db':
+      '@openmento/db':
         specifier: workspace:*
         version: link:../db
-      '@educlip/rag':
+      '@openmento/rag':
         specifier: workspace:*
         version: link:../rag
       bullmq:
@@ -124,13 +124,13 @@ importers:
       '@bull-board/express':
         specifier: ^6.21.0
         version: 6.21.0
-      '@educlip/db':
+      '@openmento/db':
         specifier: workspace:*
         version: link:../packages/db
-      '@educlip/rag':
+      '@openmento/rag':
         specifier: workspace:*
         version: link:../packages/rag
-      '@educlip/shared':
+      '@openmento/shared':
         specifier: workspace:*
         version: link:../packages/shared
       '@google/generative-ai':
@@ -215,7 +215,7 @@ importers:
 
   ui:
     dependencies:
-      '@educlip/shared':
+      '@openmento/shared':
         specifier: workspace:*
         version: link:../packages/shared
       '@radix-ui/react-dialog':

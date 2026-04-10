@@ -1,5 +1,5 @@
 {
-  "name": "@educlip/db",
+  "name": "@openmento/db",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,4 +1,4 @@
--- EduClip PostgreSQL 초기화 스크립트
+-- OpenMento PostgreSQL 초기화 스크립트
 -- docker-entrypoint-initdb.d에 의해 DB 최초 생성 시 한 번 실행
 
 -- pgvector: 벡터 유사도 검색 (RAG, 포트폴리오 중복 검사)

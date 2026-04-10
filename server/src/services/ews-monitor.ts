@@ -38,16 +38,17 @@
  *  - 90~100:긴급 (Critical) → 즉시 전화 상담 예약 자동 생성
  */
 
-import { and, eq, isNull, inArray, sql } from '@educlip/db';
+import { and, eq, isNull, inArray, sql } from '@openmento/db';
 import {
   db,
   students,
   attendanceLogs,
   counselingNotes,
   ewsRiskScores,
-} from '@educlip/db';
-import type { Agent } from '@educlip/db';
+} from '@openmento/db';
+import type { Agent } from '@openmento/db';
 import { getEwsThresholds } from './ews-thresholds.js';
+import { logger } from '../utils/logger.js';
 
 // ── 상수 ────────────────────────────────────────────────────────────────────
 
@@ -408,7 +409,7 @@ export async function runEwsMonitor(
 
   if (activeStudents.length === 0) {
     logs.push('[ews_monitor] 산출 대상 없음 — 종료');
-    console.log(logs.join('\n'));
+    logger.info(logs.join('\n'));
     return summary;
   }
 
@@ -425,7 +426,7 @@ export async function runEwsMonitor(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logs.push(`[ews_monitor] Batch 로드 실패: ${msg}`);
-    console.error(logs.join('\n'));
+    logger.error(logs.join('\n'));
     throw err;
   }
 
@@ -520,7 +521,7 @@ export async function runEwsMonitor(
     `errors=${summary.errors.length}`,
   );
 
-  console.log(logs.join('\n'));
+  logger.info(logs.join('\n'));
   return summary;
 }
 

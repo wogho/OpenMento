@@ -42,9 +42,9 @@ export default function LoginPage() {
         {/* 로고 영역 */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-kakao-yellow shadow-md mb-3">
-            <span className="text-2xl" role="img" aria-label="EduClip">📚</span>
+            <span className="text-2xl" role="img" aria-label="OpenMento">📚</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">EduClip</h1>
+          <h1 className="text-2xl font-bold text-gray-800">OpenMento</h1>
           <p className="text-sm text-gray-500 mt-1">AI 기반 소크라테스식 튜터</p>
         </div>
 

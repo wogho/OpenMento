@@ -127,7 +127,7 @@ export default function ChatPage() {
         <div className="flex items-center gap-2">
           <span className="text-lg" role="img" aria-label="AI 튜터">🤖</span>
           <div>
-            <p className="text-sm font-semibold leading-tight">EduClip AI 튜터</p>
+            <p className="text-sm font-semibold leading-tight">OpenMento AI 튜터</p>
             <p className="text-[11px] opacity-70 leading-tight">교재 기반 소크라테스식 답변</p>
           </div>
         </div>

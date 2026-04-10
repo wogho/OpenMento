@@ -1,6 +1,6 @@
 # 데이터베이스
 
-EduClip은 [Drizzle ORM](https://orm.drizzle.team/)을 통해 PostgreSQL을 사용합니다. 간단한 방법부터 프로덕션 수준까지 세 가지 실행 방법을 지원합니다.
+OpenMento은 [Drizzle ORM](https://orm.drizzle.team/)을 통해 PostgreSQL을 사용합니다. 간단한 방법부터 프로덕션 수준까지 세 가지 실행 방법을 지원합니다.
 
 ## 1. 임베디드 PostgreSQL — 설정 불필요
 
@@ -12,12 +12,12 @@ pnpm dev
 
 최초 시작 시 서버는 다음을 수행합니다:
 
-1. `~/.educlip/instances/default/db/` 디렉터리를 생성합니다.
-2. `educlip` 데이터베이스가 존재하는지 확인합니다.
+1. `~/.openmento/instances/default/db/` 디렉터리를 생성합니다.
+2. `openmento` 데이터베이스가 존재하는지 확인합니다.
 3. 빈 데이터베이스에 마이그레이션을 자동으로 적용합니다.
 4. 요청 수신을 시작합니다.
 
-데이터는 `~/.educlip/instances/default/db/` 에 재시작 후에도 유지됩니다.  
+데이터는 `~/.openmento/instances/default/db/` 에 재시작 후에도 유지됩니다.  
 로컬 개발 데이터를 초기화하려면 해당 디렉터리를 삭제합니다.
 
 보류 중인 마이그레이션을 수동으로 적용하려면:
@@ -41,7 +41,7 @@ docker compose up -d
 ```sh
 cp .env.example .env
 # .env에 이미 포함된 내용:
-# DATABASE_URL=postgres://educlip:educlip@localhost:5432/educlip
+# DATABASE_URL=postgres://openmento:openmento@localhost:5432/openmento
 ```
 
 마이그레이션을 실행합니다:
@@ -62,7 +62,7 @@ pnpm dev
 
 ### pgvector 확장 활성화
 
-EduClip의 RAG 파이프라인은 `pgvector` 확장을 필요로 합니다. 호스팅 환경에서 반드시 활성화해야 합니다.
+OpenMento의 RAG 파이프라인은 `pgvector` 확장을 필요로 합니다. 호스팅 환경에서 반드시 활성화해야 합니다.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;

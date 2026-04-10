@@ -1,8 +1,8 @@
 {
-  "name": "educlip",
+  "name": "openmento",
   "version": "0.1.0",
   "private": true,
-  "description": "EduClip — 다중 에이전트 오케스트레이션 기반 AI 교육 플랫폼",
+  "description": "OpenMento — 다중 에이전트 오케스트레이션 기반 AI 교육 플랫폼",
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
@@ -12,9 +12,9 @@
     "build": "pnpm --filter '!ui' build && pnpm --filter ui build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "db:generate": "pnpm --filter @educlip/db db:generate",
-    "db:migrate": "pnpm --filter @educlip/db db:migrate",
-    "db:seed": "pnpm --filter @educlip/db db:seed",
+    "db:generate": "pnpm --filter @openmento/db db:generate",
+    "db:migrate": "pnpm --filter @openmento/db db:migrate",
+    "db:seed": "pnpm --filter @openmento/db db:seed",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
     "docker:dev": "docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up",

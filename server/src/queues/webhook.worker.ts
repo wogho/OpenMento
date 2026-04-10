@@ -30,7 +30,7 @@ import {
   eq,
   and,
   isNull,
-} from '@educlip/db';
+} from '@openmento/db';
 import {
   generateCodeReview,
   summarizePushPayload,

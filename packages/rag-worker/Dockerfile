@@ -1,5 +1,5 @@
 # ============================================================
-# EduClip RAG Worker — Multi-stage Dockerfile
+# OpenMento RAG Worker — Multi-stage Dockerfile
 # Plan.md Phase 5-A: API 서버와 분리된 임베딩 처리 독립 프로세스
 #
 # 빌드:  docker compose build rag-worker
@@ -22,10 +22,10 @@ RUN pnpm install
 # ── 빌드 ────────────────────────────────────────────────────
 FROM deps AS builder
 COPY . .
-RUN pnpm --filter @educlip/shared build || true
-RUN pnpm --filter @educlip/db build || true
-RUN pnpm --filter @educlip/rag build || true
-RUN pnpm --filter @educlip/rag-worker build
+RUN pnpm --filter @openmento/shared build || true
+RUN pnpm --filter @openmento/db build || true
+RUN pnpm --filter @openmento/rag build || true
+RUN pnpm --filter @openmento/rag-worker build
 
 # ── 프로덕션 ─────────────────────────────────────────────────
 FROM node:24-alpine AS production

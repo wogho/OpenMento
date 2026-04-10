@@ -22,7 +22,7 @@ import {
   and,
   lt,
   sql,
-} from '@educlip/db';
+} from '@openmento/db';
 import { sendSystemAlert } from './slack-notifier.js';
 
 const STALE_THRESHOLD_HOURS = 24;

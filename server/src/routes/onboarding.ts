@@ -17,7 +17,7 @@ import {
   onboardingCompletions,
   eq,
   sql,
-} from '@educlip/db';
+} from '@openmento/db';
 import { io } from '../socket/chat.handler.js';
 
 const router: ReturnType<typeof Router> = Router();

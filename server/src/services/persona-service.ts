@@ -18,7 +18,7 @@ import {
   isNull,
   or,
   and,
-} from '@educlip/db';
+} from '@openmento/db';
 import { PERSONA_TEMPLATES as SEED_TEMPLATES } from './persona-prompts.js';
 
 export interface PersonaRecord {

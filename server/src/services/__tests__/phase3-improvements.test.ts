@@ -40,7 +40,7 @@ import {
 // ── Mock 설정 ─────────────────────────────────────────────────────────────────
 
 // DB와 Slack 등 외부 의존성을 모킹합니다
-vi.mock('@educlip/db', () => ({
+vi.mock('@openmento/db', () => ({
   db: {},
   agents: {},
   auditLogs: {},
@@ -231,6 +231,7 @@ describe('[개선②] createAdapterWithFallback — 서킷 브레이커 통합',
     const wrapped = createAdapterWithFallback(primaryConfig, fallbackConfig);
 
     // primary chat을 항상 실패하게 mock
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const primaryChatSpy = vi.spyOn(wrapped as any, 'chat').mockImplementation(async () => {
       throw new Error('503 Service Unavailable');
     });

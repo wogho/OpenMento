@@ -10,7 +10,7 @@
  * 실패해도 메인 흐름을 막지 않도록 내부적으로 에러를 흡수합니다.
  */
 
-import { db, auditLogs } from '@educlip/db';
+import { db, auditLogs } from '@openmento/db';
 import { McpHttpError } from './connector-fetch.js';
 
 export interface McpAuditPayload {

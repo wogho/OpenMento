@@ -1,6 +1,6 @@
 {
-  "name": "EduClip AI 튜터",
-  "short_name": "EduClip",
+  "name": "OpenMento AI 튜터",
+  "short_name": "OpenMento",
   "description": "AI 기반 소크라테스식 교육 플랫폼",
   "start_url": "/",
   "display": "standalone",

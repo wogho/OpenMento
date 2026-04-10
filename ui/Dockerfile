@@ -1,5 +1,5 @@
 # ============================================================
-# EduClip UI — Multi-stage Dockerfile
+# OpenMento UI — Multi-stage Dockerfile
 # Stages: base → deps → dev (Vite) | builder → production (Nginx)
 # ============================================================
 
@@ -18,13 +18,13 @@ RUN pnpm install
 FROM deps AS dev
 COPY . .
 EXPOSE 5173
-CMD ["pnpm", "--filter", "@educlip/ui", "dev", "--host", "0.0.0.0"]
+CMD ["pnpm", "--filter", "@openmento/ui", "dev", "--host", "0.0.0.0"]
 
 # ── 빌드 ────────────────────────────────────────────────────
 FROM deps AS builder
 COPY . .
-RUN pnpm --filter @educlip/shared build || true
-RUN pnpm --filter @educlip/ui build
+RUN pnpm --filter @openmento/shared build || true
+RUN pnpm --filter @openmento/ui build
 
 # ── 프로덕션 (Nginx) ─────────────────────────────────────────
 FROM nginx:1.27-alpine AS production

@@ -56,6 +56,7 @@ describe('[Phase 3-2] createAdapter — 프로바이더 팩토리', () => {
 
   it('DoD② 지원하지 않는 프로바이더는 즉시 에러 throw', () => {
     expect(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       createAdapter({ provider: 'unknown' as any, model: 'x' }),
     ).toThrow(/지원하지 않는 LLM 프로바이더/);
   });

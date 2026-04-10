@@ -25,7 +25,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const TOKEN_KEY = 'educlip_token';
+const TOKEN_KEY = 'openmento_token';
 
 function decodeJwt(token: string): AuthUser | null {
   try {

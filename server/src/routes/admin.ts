@@ -6,7 +6,7 @@ import { extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
-import { ingestDocument } from '@educlip/rag';
+import { ingestDocument } from '@openmento/rag';
 import { getRagIngestQueue } from '../queues/rag-ingest.queue.js';
 import {
   db,
@@ -34,7 +34,7 @@ import {
   gte,
   lte,
 
-} from '@educlip/db';
+} from '@openmento/db';
 import { invalidateSkillCache, importSkillFromGitHub } from '../services/skill-injector.js';
 import { hasCyclicParent } from '../services/agent-hierarchy.js';
 import { ConnectorRegistry } from '../mcp/registry.js';
@@ -82,7 +82,7 @@ const upload = multer({
     destination: (_req, _file, cb) => cb(null, UPLOAD_TMP_DIR),
     filename: (_req, file, cb) => {
       const ext = extname(file.originalname);
-      cb(null, `educlip-upload-${randomUUID()}${ext}`);
+      cb(null, `openmento-upload-${randomUUID()}${ext}`);
     },
   }),
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -373,7 +373,7 @@ const updateAgentSchema = createAgentSchema.partial();
  * 기관 소속 전체 에이전트 목록 조회 (소프트 딜리트 제외)
  */
 router.get('/agents', async (req, res) => {
-  const institutionId = (req as any).user?.institutionId as string | undefined;
+  const institutionId = req.user?.institutionId;
   if (!institutionId) {
     res.status(400).json({ error: 'institutionId가 없습니다.' });
     return;
@@ -398,7 +398,7 @@ router.get('/agents', async (req, res) => {
  * 특정 에이전트 조회
  */
 router.get('/agents/:id', async (req, res) => {
-  const institutionId = (req as any).user?.institutionId as string | undefined;
+  const institutionId = req.user?.institutionId;
   const { id } = req.params;
 
   const [agent] = await db
@@ -425,8 +425,8 @@ router.get('/agents/:id', async (req, res) => {
  * POST /admin/agents — 에이전트 등록 (Phase 3-2)
  */
 router.post('/agents', async (req, res) => {
-  const institutionId = (req as any).user?.institutionId as string | undefined;
-  const actorId = (req as any).user?.userId as string | undefined;
+  const institutionId = req.user?.institutionId;
+  const actorId = req.user?.sub;
   if (!institutionId) {
     res.status(400).json({ error: 'institutionId가 없습니다.' });
     return;
@@ -478,8 +478,8 @@ router.post('/agents', async (req, res) => {
  * adapterConfig, fallbackAdapterConfig, systemPrompt, isActive 등 부분 업데이트 지원
  */
 router.put('/agents/:id', async (req, res) => {
-  const institutionId = (req as any).user?.institutionId as string | undefined;
-  const actorId = (req as any).user?.userId as string | undefined;
+  const institutionId = req.user?.institutionId;
+  const actorId = req.user?.sub;
   const { id } = req.params;
 
   const parsed = updateAgentSchema.safeParse(req.body);
@@ -550,8 +550,8 @@ router.put('/agents/:id', async (req, res) => {
  * DELETE /admin/agents/:id — 에이전트 소프트 딜리트
  */
 router.delete('/agents/:id', async (req, res) => {
-  const institutionId = (req as any).user?.institutionId as string | undefined;
-  const actorId = (req as any).user?.userId as string | undefined;
+  const institutionId = req.user?.institutionId;
+  const actorId = req.user?.sub;
   const { id } = req.params;
 
   const [deleted] = await db

@@ -2,10 +2,10 @@
  * 출결 시스템 Read-only 커넥터 (plan.md 1-3)
  *
  * 외부 출결 시스템에서 날짜 범위 기준 출결 기록을 읽고,
- * EduClip DB의 attendance_logs 테이블에 동기화합니다.
+ * OpenMento DB의 attendance_logs 테이블에 동기화합니다.
  *
  * Write 금지 원칙 (plan.md 부록 B):
- *   출결 원천 데이터는 외부 시스템에서만 변경. EduClip은 Read-only 동기화만 수행합니다.
+ *   출결 원천 데이터는 외부 시스템에서만 변경. OpenMento은 Read-only 동기화만 수행합니다.
  */
 
 import type {

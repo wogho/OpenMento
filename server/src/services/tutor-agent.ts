@@ -11,15 +11,15 @@
  * GUI에서 모델을 교체해도 코드 변경이 필요 없습니다.
  */
 
-import { eq, asc, desc, and, isNull, db, conversationMessages, agents } from '@educlip/db';
-import { searchSimilarChunks } from '@educlip/rag';
+import { eq, asc, desc, and, isNull, db, conversationMessages, agents } from '@openmento/db';
+import { searchSimilarChunks } from '@openmento/rag';
 import { buildSystemPrompt } from './prompts.js';
 import { PostHog } from 'posthog-node';
 
 // ── PostHog Node 셋업 (Phase 6-3) ──────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const posthog = new PostHog(
-  process.env.POSTHOG_API_KEY || 'phc_mock_node_key_for_educlip',
+  process.env.POSTHOG_API_KEY || 'phc_mock_node_key_for_openmento',
   { host: process.env.POSTHOG_HOST || 'https://app.posthog.com' }
 );
 

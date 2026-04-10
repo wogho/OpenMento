@@ -1,7 +1,7 @@
-// EduClip PWA Service Worker
+// OpenMento PWA Service Worker
 // 오프라인 캐싱 전략: Cache First for static assets, Network First for API
 
-const CACHE_NAME = 'educlip-v1';
+const CACHE_NAME = 'openmento-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

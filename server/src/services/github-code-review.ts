@@ -23,7 +23,7 @@
  */
 
 import { z } from 'zod';
-import { db, agents, conversationMessages, eq, and, isNull } from '@educlip/db';
+import { db, agents, conversationMessages, eq, and, isNull } from '@openmento/db';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';
 import { logger } from '../utils/logger.js';

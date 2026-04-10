@@ -12,8 +12,8 @@
  *
  */
 
-import { sql } from '@educlip/db';
-import { db } from '@educlip/db';
+import { sql } from '@openmento/db';
+import { db } from '@openmento/db';
 import { getHeartbeatStatus } from './heartbeat.js';
 import { logger } from '../utils/logger.js';
 

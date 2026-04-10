@@ -24,21 +24,10 @@ import { logger } from './utils/logger.js';
 import { authLimiter, adminLimiter, chatLimiter, webhookLimiter } from './middleware/rateLimiter.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { getMetrics, requestCounter, apiResponseTimeHistogram } from './utils/metrics.js';
 import { sendSystemErrorToSlack } from './services/slack-notifier.js';
 
 const app = express();
-
-// ── Sentry APM 셋업 (Phase 6-2) ──────────────────────────────
-Sentry.init({
-  dsn: process.env.SENTRY_DSN || 'https://public@sentry.example.com/1', // 기본값은 실제 운영 환경에 맞춰 변경
-  integrations: [
-    nodeProfilingIntegration(),
-  ],
-  tracesSampleRate: 1.0, 
-  profilesSampleRate: 1.0,
-});
 
 const httpServer = createServer(app);
 
@@ -155,12 +144,12 @@ const PORT = Number(process.env.PORT) || 3000;
 createSocketServer(httpServer);
 
 httpServer.listen(PORT, () => {
-  logger.info({ port: PORT }, '[api] EduClip server listening');
+  logger.info({ port: PORT }, '[api] OpenMento server listening');
   // ── EWS 임계치 DB 연결 + 프리워밍 (Phase 2 개선: 영속성 확보) ─
   // DB 인스턴스를 주입하고 저장된 모든 기관 임계치를 캐시에 적재합니다.
   // DB 접근 실패 시 기본값(60/75/90)으로 폴백하므로 서버 기동이 중단되지 않습니다.
   void (async () => {
-    const { db } = await import('@educlip/db');
+    const { db } = await import('@openmento/db');
     initEwsThresholdsDb(db);
     await loadEwsThresholdsFromDb();
     logger.info('[ews-thresholds] DB 프리워밍 완료');

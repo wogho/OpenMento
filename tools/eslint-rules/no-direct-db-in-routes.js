@@ -4,14 +4,14 @@
  * ESLint 커스텀 룰 — Phase 5-2 ② 트랜잭션 이탈(Context Escape) 방지
  *
  * 목적:
- *   server/src/routes/ 파일에서 @educlip/db 의 `db` 객체를 직접 사용하는 것을
+ *   server/src/routes/ 파일에서 @openmento/db 의 `db` 객체를 직접 사용하는 것을
  *   금지합니다. 모든 DB 접근은 반드시:
  *     - withTenantContext()  (멀티 테넌트 격리 트랜잭션)
  *     - server/src/repositories/ 계층
  *   를 통해서만 이뤄져야 합니다.
  *
  * 탐지 패턴:
- *   1. `import { db } from '@educlip/db'` — routes 파일에서 db 직접 import
+ *   1. `import { db } from '@openmento/db'` — routes 파일에서 db 직접 import
  *   2. `db.select(...)`, `db.insert(...)` 등 — db 객체 메서드 호출
  *      (withTenantContext 내부의 tx.* 는 허용)
  *
@@ -60,7 +60,7 @@ module.exports = {
     ],
     messages: {
       noDirectDbImport:
-        "Route 파일에서 '{{ symbol }}'를 @educlip/db 에서 직접 import할 수 없습니다. " +
+        "Route 파일에서 '{{ symbol }}'를 @openmento/db 에서 직접 import할 수 없습니다. " +
         'withTenantContext(tx => ...) 또는 repositories 계층을 사용하세요.',
       noDirectDbCall:
         "'{{ symbol }}.{{ method }}()' 를 route 파일에서 직접 호출할 수 없습니다. " +
@@ -98,9 +98,9 @@ module.exports = {
     const importedForbiddenSymbols = new Set();
 
     return {
-      // import { db } from '@educlip/db' 감지
+      // import { db } from '@openmento/db' 감지
       ImportDeclaration(node) {
-        if (node.source.value !== '@educlip/db') return;
+        if (node.source.value !== '@openmento/db') return;
 
         for (const specifier of node.specifiers) {
           if (specifier.type === 'ImportSpecifier') {

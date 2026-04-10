@@ -1,5 +1,5 @@
 # ============================================================
-# EduClip API Server — Multi-stage Dockerfile
+# OpenMento API Server — Multi-stage Dockerfile
 # Stages: base → deps → dev (hot-reload) | builder → production
 # ============================================================
 
@@ -21,15 +21,15 @@ FROM deps AS dev
 COPY . .
 EXPOSE 3000 3001
 USER node
-CMD ["pnpm", "--filter", "@educlip/server", "dev"]
+CMD ["pnpm", "--filter", "@openmento/server", "dev"]
 
 # ── 빌드 ────────────────────────────────────────────────────
 FROM deps AS builder
 COPY . .
-RUN pnpm --filter @educlip/shared build || true
-RUN pnpm --filter @educlip/db build || true
-RUN pnpm --filter @educlip/rag build || true
-RUN pnpm --filter @educlip/server build
+RUN pnpm --filter @openmento/shared build || true
+RUN pnpm --filter @openmento/db build || true
+RUN pnpm --filter @openmento/rag build || true
+RUN pnpm --filter @openmento/server build
 
 # ── 프로덕션 ─────────────────────────────────────────────────
 FROM node:24-alpine AS production

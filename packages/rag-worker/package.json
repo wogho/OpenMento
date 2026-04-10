@@ -1,5 +1,5 @@
 {
-  "name": "@educlip/rag-worker",
+  "name": "@openmento/rag-worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@educlip/db": "workspace:*",
-    "@educlip/rag": "workspace:*",
+    "@openmento/db": "workspace:*",
+    "@openmento/rag": "workspace:*",
     "bullmq": "^5.0.0",
     "pino": "^9.0.0"
   },

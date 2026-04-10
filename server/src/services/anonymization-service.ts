@@ -28,7 +28,7 @@ import {
   and,
   isNull,
   sql,
-} from '@educlip/db';
+} from '@openmento/db';
 import { logger } from '../utils/logger.js';
 
 // ── 마스킹 유틸 ──────────────────────────────────────────────────────────────

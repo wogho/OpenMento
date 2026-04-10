@@ -49,7 +49,7 @@ import {
   lt,
   isNotNull,
   inArray,
-} from '@educlip/db';
+} from '@openmento/db';
 import { logger } from '../utils/logger.js';
 
 // ── 5년 보존 기한 상수 ────────────────────────────────────────────────────────

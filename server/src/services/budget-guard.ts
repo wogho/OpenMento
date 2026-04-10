@@ -30,7 +30,7 @@ import {
   gte,
   lte,
   sql,
-} from '@educlip/db';
+} from '@openmento/db';
 import { Redis as IORedis } from 'ioredis';
 import { logger } from '../utils/logger.js';
 
@@ -170,7 +170,7 @@ function getRedisClient(): IORedis | null {
 }
 
 function spendCacheKey(institutionId: string, agentId: string | null, yearMonth: string): string {
-  return `educlip:budget:spend:${institutionId}:${agentId ?? 'global'}:${yearMonth}`;
+  return `openmento:budget:spend:${institutionId}:${agentId ?? 'global'}:${yearMonth}`;
 }
 
 function currentYearMonth(): string {
@@ -274,7 +274,7 @@ async function sendSoftAlertIfNeeded(
 
   const payload = {
     text:
-      `⚠️ *[EduClip 예산 ${policy.alertThresholdPct}% 경고]* ${label}\n` +
+      `⚠️ *[OpenMento 예산 ${policy.alertThresholdPct}% 경고]* ${label}\n` +
       `이번 달 LLM 사용량이 *${pct.toFixed(1)}%* 에 도달했습니다.\n` +
       `💰 사용: $${spendUsd.toFixed(4)} / 한도: $${policy.limitUsd.toFixed(2)}`,
   };

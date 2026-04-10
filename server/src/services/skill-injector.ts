@@ -15,9 +15,9 @@
  */
 
 import { LRUCache } from 'lru-cache';
-import type { Db } from '@educlip/db';
-import { instructorSkills } from '@educlip/db/schema';
-import { eq, and, isNull, desc } from '@educlip/db';
+import type { Db } from '@openmento/db';
+import { instructorSkills } from '@openmento/db/schema';
+import { eq, and, isNull, desc } from '@openmento/db';
 
 // ── Write-Through LRU 캐시 ───────────────────────────────────────────────────
 // agentId → (markdown | null)

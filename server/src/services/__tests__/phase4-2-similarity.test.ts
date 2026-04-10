@@ -82,8 +82,8 @@ const {
 
 // ── DB Mock ──────────────────────────────────────────────────────────────────
 
-vi.mock('@educlip/db', async () => {
-  const actual = await vi.importActual<typeof import('@educlip/db')>('@educlip/db');
+vi.mock('@openmento/db', async () => {
+  const actual = await vi.importActual<typeof import('@openmento/db')>('@openmento/db');
   return {
     ...actual,
     db: mockDb,
@@ -95,8 +95,8 @@ vi.mock('@educlip/db', async () => {
 
 // ── RAG embedder Mock ────────────────────────────────────────────────────────
 
-vi.mock('@educlip/rag', async () => {
-  const actual = await vi.importActual<typeof import('@educlip/rag')>('@educlip/rag');
+vi.mock('@openmento/rag', async () => {
+  const actual = await vi.importActual<typeof import('@openmento/rag')>('@openmento/rag');
   return {
     ...actual,
     embedText: mockEmbedText,

@@ -60,9 +60,9 @@ const STUDENTS_AFTER_UPDATE = [
 // ── 공통 셋업 ─────────────────────────────────────────────────────────────────
 
 async function setupAdminSession(page: Page): Promise<void> {
-  // 관리자 JWT를 localStorage에 주입 (키: useAuth.tsx의 TOKEN_KEY = 'educlip_token')
+  // 관리자 JWT를 localStorage에 주입 (키: useAuth.tsx의 TOKEN_KEY = 'openmento_token')
   await page.addInitScript((token: string) => {
-    localStorage.setItem('educlip_token', token);
+    localStorage.setItem('openmento_token', token);
   }, ADMIN_TOKEN);
 }
 

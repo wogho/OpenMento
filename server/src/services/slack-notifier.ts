@@ -19,13 +19,14 @@
  *
  * ── 신뢰성 설계 ─────────────────────────────────────────────────────────────
  *
- *  - 외부 API 실패 시 console.error 후 계속 진행 (throw X)
+ *  - 외부 API 실패 시 logger.error 후 계속 진행 (throw X)
  *  - Heartbeat 트랜잭션을 블로킹하지 않도록 호출부에서 void fire-and-forget 사용
  */
 
-import { db, consultationBookings } from '@educlip/db';
+import { db, consultationBookings } from '@openmento/db';
 import { sendMentalCareMessage } from './mental-care-agent.js';
 import type { EwsScoreResult } from './ews-monitor.js';
+import { logger } from '../utils/logger.js';
 
 // ── 상수 ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ function buildSlackPayload(
             elements: [
               {
                 type: 'mrkdwn',
-                text: `*EduClip EWS* | ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST`,
+                text: `*OpenMento EWS* | ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST`,
               },
             ],
           },
@@ -143,7 +144,7 @@ async function createConsultationBookings(
 
   await db.insert(consultationBookings).values(rows);
 
-  console.log(
+  logger.info(
     `[slack-notifier] 상담 예약 자동 생성: ${rows.length}건 ` +
     `(institutionId=${institutionId})`,
   );
@@ -159,7 +160,7 @@ async function createConsultationBookings(
  * - high_risk 이상이면 멘탈케어 에이전트 안부 메시지를 트리거합니다.
  * - critical이면 상담 예약을 자동 생성합니다.
  *
- * 이 함수는 절대 throw 하지 않습니다. 외부 API 실패는 console.error 후 계속합니다.
+ * 이 함수는 절대 throw 하지 않습니다. 외부 API 실패는 logger.error 후 계속합니다.
  *
  * @param institutionId  기관 UUID
  * @param scores         EWS 전체 산출 결과 배열
@@ -188,25 +189,25 @@ export async function sendEwsEscalations(
     if (warningScores.length > 0) {
       slackTasks.push(
         postToSlack(webhookUrl, buildSlackPayload(warningScores, 'warning'))
-          .catch((err) => console.error('[slack-notifier] warning 발송 실패:', err)),
+          .catch((err) => logger.error({ err }, '[slack-notifier] warning 발송 실패')),
       );
     }
     if (highRiskScores.length > 0) {
       slackTasks.push(
         postToSlack(webhookUrl, buildSlackPayload(highRiskScores, 'high_risk'))
-          .catch((err) => console.error('[slack-notifier] high_risk 발송 실패:', err)),
+          .catch((err) => logger.error({ err }, '[slack-notifier] high_risk 발송 실패')),
       );
     }
     if (criticalScores.length > 0) {
       slackTasks.push(
         postToSlack(webhookUrl, buildSlackPayload(criticalScores, 'critical'))
-          .catch((err) => console.error('[slack-notifier] critical 발송 실패:', err)),
+          .catch((err) => logger.error({ err }, '[slack-notifier] critical 발송 실패')),
       );
     }
 
     await Promise.allSettled(slackTasks);
   } else if (needsSlack) {
-    console.warn(
+    logger.warn(
       '[slack-notifier] SLACK_WEBHOOK_URL 미설정 — Slack 알림 건너뜀. ' +
       '(PUT /admin/secrets 로 slackWebhookUrl 설정 필요)',
     );
@@ -218,9 +219,9 @@ export async function sendEwsEscalations(
     const careTasks = careTargets.map((s) =>
       sendMentalCareMessage(institutionId, s.studentId, s.courseId, s.totalScore)
         .catch((err) =>
-          console.error(
-            `[slack-notifier] 멘탈케어 메시지 실패 studentId=${s.studentId}:`,
-            err,
+          logger.error(
+            { err, studentId: s.studentId },
+            '[slack-notifier] 멘탈케어 메시지 실패',
           ),
         ),
     );
@@ -230,12 +231,12 @@ export async function sendEwsEscalations(
   // ── 3. 상담 예약 자동 생성 (critical) ─────────────────────────────────────
   if (needsBooking) {
     await createConsultationBookings(institutionId, criticalScores).catch((err) =>
-      console.error('[slack-notifier] 상담 예약 생성 실패:', err),
+      logger.error({ err }, '[slack-notifier] 상담 예약 생성 실패'),
     );
   }
 
   // ── 결과 로그 ──────────────────────────────────────────────────────────────
-  console.log(
+  logger.info(
     `[slack-notifier] 에스컬레이션 완료 — ` +
     `warning=${warningScores.length} ` +
     `high_risk=${highRiskScores.length} ` +
@@ -277,7 +278,7 @@ export async function sendSystemAlert(message: string): Promise<void> {
               elements: [
                 {
                   type: 'mrkdwn',
-                  text: `*EduClip 시스템* | ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST`,
+                  text: `*OpenMento 시스템* | ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} KST`,
                 },
               ],
             },
@@ -286,13 +287,13 @@ export async function sendSystemAlert(message: string): Promise<void> {
       ],
     });
   } catch (err) {
-    console.error('[slack-notifier] 시스템 알림 발송 실패:', err);
+    logger.error({ err }, '[slack-notifier] 시스템 알림 발송 실패');
   }
 }
 
 export async function sendSlackTestMessage(webhookUrl: string): Promise<void> {
   await postToSlack(webhookUrl, {
-    text: '✅ EduClip EWS — Slack 연동 테스트 메시지입니다.',
+    text: '✅ OpenMento EWS — Slack 연동 테스트 메시지입니다.',
     attachments: [
       {
         color: '#36a64f',
@@ -301,7 +302,7 @@ export async function sendSlackTestMessage(webhookUrl: string): Promise<void> {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*EduClip EWS Slack 알림이 정상 연동되었습니다.* 🎉\n실제 위험 수강생 감지 시 이 채널로 에스컬레이션 알림이 발송됩니다.',
+              text: '*OpenMento EWS Slack 알림이 정상 연동되었습니다.* 🎉\n실제 위험 수강생 감지 시 이 채널로 에스컬레이션 알림이 발송됩니다.',
             },
           },
           {
@@ -322,12 +323,12 @@ export async function sendSlackTestMessage(webhookUrl: string): Promise<void> {
 export async function sendSystemErrorToSlack(
   webhookUrl: string,
   error: Error,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): Promise<void> {
-  const blocks: any[] = [
+  const blocks: unknown[] = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: '🚨 [EduClip] System Critical Error' },
+      text: { type: 'plain_text', text: '🚨 [OpenMento] System Critical Error' },
     },
     {
       type: 'section',
@@ -369,9 +370,9 @@ export async function sendSystemErrorToSlack(
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
-      console.error(`Failed to send slack alert. Status: ${response.status}`);
+      logger.error({ status: response.status }, 'Failed to send slack alert');
     }
   } catch (err) {
-    console.error('Network error sending slack alert:', err);
+    logger.error({ err }, 'Network error sending slack alert');
   }
 }

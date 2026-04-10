@@ -14,5 +14,5 @@ const server = createServer((_req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.info(`[mcp-gateway] EduClip MCP Gateway listening on :${PORT}`);
+  console.info(`[mcp-gateway] OpenMento MCP Gateway listening on :${PORT}`);
 });

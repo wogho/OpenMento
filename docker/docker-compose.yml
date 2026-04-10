@@ -1,4 +1,4 @@
-# EduClip — Docker Compose
+# OpenMento — Docker Compose
 # Production:  pnpm docker:up
 # Development: pnpm docker:dev
 
@@ -12,7 +12,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-educlip_user}:${POSTGRES_PASSWORD:-educlip_pass}@db:5432/${POSTGRES_DB:-educlip_db}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-openmento_user}:${POSTGRES_PASSWORD:-openmento_pass}@db:5432/${POSTGRES_DB:-openmento_db}
       NODE_ENV: production
       PORT: "3000"
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars}
@@ -43,14 +43,14 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-educlip_db}
-      POSTGRES_USER: ${POSTGRES_USER:-educlip_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-educlip_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-openmento_db}
+      POSTGRES_USER: ${POSTGRES_USER:-openmento_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openmento_pass}
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-educlip_user} -d ${POSTGRES_DB:-educlip_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openmento_user} -d ${POSTGRES_DB:-openmento_db}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -63,7 +63,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -92,7 +92,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-educlip_user}:${POSTGRES_PASSWORD:-educlip_pass}@db:5432/${POSTGRES_DB:-educlip_db}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-openmento_user}:${POSTGRES_PASSWORD:-openmento_pass}@db:5432/${POSTGRES_DB:-openmento_db}
       NODE_ENV: production
       PORT: "3001"
       SERVER_MODE: mcp
@@ -127,7 +127,7 @@ services:
       context: ..
       dockerfile: packages/rag-worker/Dockerfile
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-educlip_user}:${POSTGRES_PASSWORD:-educlip_pass}@db:5432/${POSTGRES_DB:-educlip_db}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-openmento_user}:${POSTGRES_PASSWORD:-openmento_pass}@db:5432/${POSTGRES_DB:-openmento_db}
       REDIS_URL: redis://redis:6379
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       UPLOAD_TMP_DIR: /tmp/uploads
@@ -153,8 +153,8 @@ services:
 
 volumes:
   db_data:
-    name: educlip_db_data
+    name: openmento_db_data
   redis_data:
-    name: educlip_redis_data
+    name: openmento_redis_data
   uploads_tmp:
-    name: educlip_uploads_tmp
+    name: openmento_uploads_tmp

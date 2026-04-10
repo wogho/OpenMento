@@ -163,7 +163,7 @@ describe('[Phase 3-1] buildSystemPrompt — 강사 스킬 주입', () => {
     expect(prompt).toContain('강사 지정 규칙 (최우선 적용)');
     expect(prompt).toContain(skillMd);
     // 기본 소크라테스 프롬프트보다 뒤에 위치
-    const baseIdx = prompt.indexOf('EduClip AI 튜터');
+    const baseIdx = prompt.indexOf('OpenMento AI 튜터');
     const skillIdx = prompt.indexOf('강사 지정 규칙');
     expect(skillIdx).toBeGreaterThan(baseIdx);
   });
@@ -171,12 +171,14 @@ describe('[Phase 3-1] buildSystemPrompt — 강사 스킬 주입', () => {
   it('RAG 컨텍스트 + 스킬 모두 주입 시 두 섹션이 모두 포함됨', () => {
     const ragResults = [
       {
+        id: 'chunk-001',
         chunkText: '재귀 함수는 자기 자신을 호출합니다.',
         sourceFileName: 'java_basic.pdf',
         chunkIndex: 0,
-        score: 0.9,
+        pageNumber: null,
+        distance: 0.1,
       },
-    ] as any; // RAG 인터페이스를 맞추기 위해 강제 캐스팅 (lint 무시) // eslint-disable-line @typescript-eslint/no-explicit-any
+    ]
     const skillMd = '# 코드 리뷰 규칙\n- 변수명에 의미를 담아라';
     const prompt = buildSystemPrompt(ragResults, skillMd);
     expect(prompt).toContain('강사 지정 규칙');

@@ -6,7 +6,7 @@
  */
 
 import { sql, and, isNull } from 'drizzle-orm';
-import { db, ragDocuments } from '@educlip/db';
+import { db, ragDocuments } from '@openmento/db';
 import { embedText } from './embedder.js';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────

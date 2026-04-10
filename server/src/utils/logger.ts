@@ -28,7 +28,7 @@ export const logger = pino(
       error: pino.stdSerializers.err,
     },
     base: {
-      service: 'educlip-api',
+      service: 'openmento-api',
       env: process.env['NODE_ENV'] ?? 'development',
     },
   },

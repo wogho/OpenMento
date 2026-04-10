@@ -25,7 +25,7 @@ import {
   eq,
   sql,
   desc,
-} from '@educlip/db';
+} from '@openmento/db';
 import { auditPiiExposure } from '../services/anonymization-service.js';
 
 const router: ReturnType<typeof Router> = Router();

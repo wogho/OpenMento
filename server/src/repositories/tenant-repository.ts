@@ -20,7 +20,7 @@
  *   const list = await repo.list(req.user.institutionId);
  */
 
-import { withTenantContext } from '@educlip/db';
+import { withTenantContext } from '@openmento/db';
 import {
   db,
   students,
@@ -32,7 +32,7 @@ import {
   and,
   isNull,
   sql,
-} from '@educlip/db';
+} from '@openmento/db';
 
 type TxClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 

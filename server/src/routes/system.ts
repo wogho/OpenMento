@@ -21,7 +21,7 @@ import {
   eq,
   desc,
   sql,
-} from '@educlip/db';
+} from '@openmento/db';
 import { getSystemStatus } from '../services/system-status.js';
 import { logger } from '../utils/logger.js';
 

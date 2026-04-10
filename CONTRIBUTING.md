@@ -60,7 +60,7 @@ PR 설명은 [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)을 따라야 합�
 
 ### 사고 경로 예시 1:
 
-> - EduClip은 AI 에이전트를 통해 교육 기관 운영을 자동화합니다.
+> - OpenMento은 AI 에이전트를 통해 교육 기관 운영을 자동화합니다.
 > - 수강생들의 포트폴리오 제출물 표절을 탐지하는 기능이 있습니다.
 > - 하지만 현재 유사도 임계값이 기관별로 설정 불가능합니다.
 > - 따라서 기관별로 임계값을 커스터마이즈할 수 있도록 설정을 추가해야 합니다.
@@ -69,7 +69,7 @@ PR 설명은 [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)을 따라야 합�
 
 ### 사고 경로 예시 2:
 
-> - EduClip은 에이전트 하트비트를 통해 정기 업무를 자동화합니다.
+> - OpenMento은 에이전트 하트비트를 통해 정기 업무를 자동화합니다.
 > - 관리자가 에이전트의 실시간 상태를 모니터링할 수 있어야 합니다.
 > - 현재 대시보드에서 에이전트 마지막 하트비트 시간이 표시되지 않습니다.
 > - 이 PR은 에이전트 카드에 마지막 활성화 시간을 표시하는 UI를 추가합니다.
@@ -84,4 +84,4 @@ PR 설명은 [PR 템플릿](.github/PULL_REQUEST_TEMPLATE.md)을 따라야 합�
 ## 보안 관련 기여
 
 보안 취약점을 발견한 경우 공개 이슈를 생성하지 마십시오.  
-[GitHub Security Advisories](https://github.com/wogho/EduClip/security/advisories)를 통해 비공개로 신고해 주세요.
+[GitHub Security Advisories](https://github.com/wogho/OpenMento/security/advisories)를 통해 비공개로 신고해 주세요.

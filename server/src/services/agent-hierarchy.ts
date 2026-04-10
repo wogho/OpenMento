@@ -12,7 +12,7 @@
  *  DB 조회 횟수는 트리 깊이만큼만 수행됩니다(최대 ~10회, 실제 트리 깊이 제한).
  */
 
-import { db, agents, eq, and, isNull } from '@educlip/db';
+import { db, agents, eq, and, isNull } from '@openmento/db';
 
 /** 에이전트 DB row에서 순환 감지에 필요한 최소 필드 */
 interface AgentParentRow {

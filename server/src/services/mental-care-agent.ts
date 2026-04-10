@@ -23,10 +23,11 @@
  * Heartbeat 파이프라인에 영향을 주지 않습니다.
  */
 
-import { db, agents, conversationMessages, eq, and, isNull, desc } from '@educlip/db';
+import { db, agents, conversationMessages, eq, and, isNull, desc } from '@openmento/db';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig } from '../adapters/index.js';
 import { recordCostEvent } from './budget-guard.js';
+import { logger } from '../utils/logger.js';
 
 // ── 공감 메시지 템플릿 풀 ─────────────────────────────────────────────────────
 // LLM 설정이 없거나 실패 시 랜덤 선택하여 사용합니다.
@@ -129,7 +130,7 @@ export async function sendMentalCareMessage(
         }
       } catch (err) {
         // LLM 실패 → 템플릿 계속 사용 (이미 pickRandomTemplate() 로 설정됨)
-        console.warn('[mental-care-agent] LLM 생성 실패, 템플릿 사용:', err);
+        logger.warn({ err }, '[mental-care-agent] LLM 생성 실패, 템플릿 사용');
       }
     }
   }
@@ -172,7 +173,7 @@ export async function sendMentalCareMessage(
     llmMetaJson: llmMetaJson ?? undefined,
   });
 
-  console.log(
+  logger.info(
     `[mental-care-agent] 안부 메시지 저장 완료 — ` +
     `studentId=${studentId.slice(0, 8)}… score=${riskScore} ` +
     `method=${llmMetaJson ? 'llm' : 'template'}`,

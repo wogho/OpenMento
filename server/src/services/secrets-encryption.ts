@@ -34,7 +34,7 @@
  *   - 키는 환경 변수로만 관리하며 소스 코드·DB에 절대 저장하지 않습니다.
  */
 
-import { db, sql } from '@educlip/db';
+import { db, sql } from '@openmento/db';
 import { logger } from '../utils/logger.js';
 
 // ── 암호화 키 (Fail-Fast) ─────────────────────────────────────────────────────

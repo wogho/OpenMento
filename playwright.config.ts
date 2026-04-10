@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * EduClip E2E Playwright 설정
+ * OpenMento E2E Playwright 설정
  *
  * 로컬 개발: vite dev 서버 사용 (포트 4173 강제)
  * CI:        pnpm build 후 vite preview 사용
@@ -36,8 +36,8 @@ export default defineConfig({
     // CI: build가 이미 완료된 상태에서 preview만 실행
     // 로컬: Vite dev 서버 직접 실행 (빌드 불필요)
     command: process.env.CI
-      ? 'pnpm --filter @educlip/ui preview --port 4173'
-      : 'pnpm --filter @educlip/ui dev --port 4173 --strictPort',
+      ? 'pnpm --filter @openmento/ui preview --port 4173'
+      : 'pnpm --filter @openmento/ui dev --port 4173 --strictPort',
     port: 4173,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -38,7 +38,7 @@ jobs:
           context: .
           file: docker/Dockerfile.server
           push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/educlip-server:${{ github.sha }}
+          tags: ${{ steps.login-ecr.outputs.registry }}/openmento-server:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 

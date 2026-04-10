@@ -41,7 +41,7 @@ export default function ChatBubble({ message, isStreaming }: ChatBubbleProps) {
       </div>
 
       <div className="flex flex-col gap-1 min-w-0" style={{ maxWidth: 'calc(100% - 2.5rem)' }}>
-        <span className="text-xs font-medium text-gray-600">EduClip AI</span>
+        <span className="text-xs font-medium text-gray-600">OpenMento AI</span>
 
         <div className="flex items-end gap-1">
           <div className="bubble-base bg-[var(--bubble-ai)] border border-gray-100 rounded-bl-sm shadow-sm">

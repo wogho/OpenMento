@@ -5,7 +5,7 @@
 
 ## 1. 개요
 
-EduClip은 두 가지 런타임 모드를 지원합니다:
+OpenMento은 두 가지 런타임 모드를 지원합니다:
 
 1. `local_trusted`
 2. `authenticated`
@@ -101,7 +101,7 @@ BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
 
 ```sh
 BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
-DATABASE_URL=postgres://user:pass@host:5432/educlip \
+DATABASE_URL=postgres://user:pass@host:5432/openmento \
   docker compose -f docker/docker-compose.yml up --build
 ```
 

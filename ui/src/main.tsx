@@ -9,7 +9,7 @@ import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
 
 // ── PostHog Analytics 셋업 (Phase 6-3) ──────────────────────────────
-posthog.init(import.meta.env.VITE_POSTHOG_KEY || 'phc_mock_key_for_educlip', {
+posthog.init(import.meta.env.VITE_POSTHOG_KEY || 'phc_mock_key_for_openmento', {
   api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com',
   loaded: (posthog) => {
     if (import.meta.env.DEV) posthog.debug();

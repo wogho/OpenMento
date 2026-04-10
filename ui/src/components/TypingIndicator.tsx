@@ -16,7 +16,7 @@ export default function TypingIndicator() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-gray-600">EduClip AI</span>
+        <span className="text-xs font-medium text-gray-600">OpenMento AI</span>
         <div role="status" aria-live="polite" className="bg-white border border-gray-100 rounded-2xl rounded-bl-sm shadow-sm px-4 py-3 flex items-center gap-1">
           <Lottie
             animationData={thinkingAnimation}
