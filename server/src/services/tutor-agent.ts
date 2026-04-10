@@ -14,6 +14,14 @@
 import { eq, asc, desc, and, isNull, db, conversationMessages, agents } from '@educlip/db';
 import { searchSimilarChunks } from '@educlip/rag';
 import { buildSystemPrompt } from './prompts.js';
+import { PostHog } from 'posthog-node';
+
+// ── PostHog Node 셋업 (Phase 6-3) ──────────────────────────────
+const posthog = new PostHog(
+  process.env.POSTHOG_API_KEY || 'phc_mock_node_key_for_educlip',
+  { host: process.env.POSTHOG_HOST || 'https://app.posthog.com' }
+);
+
 import { getSkillMarkdown } from './skill-injector.js';
 import { createAdapterWithFallback } from '../adapters/index.js';
 import type { AdapterConfig, LlmMessage } from '../adapters/index.js';

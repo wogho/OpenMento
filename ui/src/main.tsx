@@ -5,6 +5,16 @@ import './index.css';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import * as Sentry from '@sentry/react';
+import posthog from 'posthog-js';
+import { PostHogProvider } from 'posthog-js/react';
+
+// ── PostHog Analytics 셋업 (Phase 6-3) ──────────────────────────────
+posthog.init(import.meta.env.VITE_POSTHOG_KEY || 'phc_mock_key_for_educlip', {
+  api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com',
+  loaded: (posthog) => {
+    if (import.meta.env.DEV) posthog.debug();
+  }
+});
 
 // ── Sentry APM 셋업 (Phase 6-2) ──────────────────────────────
 Sentry.init({
@@ -42,7 +52,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <PostHogProvider client={posthog}>
+          <App />
+        </PostHogProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>,

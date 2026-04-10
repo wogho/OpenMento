@@ -324,7 +324,7 @@ export async function sendSystemErrorToSlack(
   error: Error,
   context?: Record<string, any>
 ): Promise<void> {
-  const blocks = [
+  const blocks: any[] = [
     {
       type: 'header',
       text: { type: 'plain_text', text: '🚨 [EduClip] System Critical Error' },
