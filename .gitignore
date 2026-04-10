@@ -39,3 +39,6 @@ Thumbs.db
 
 # 업로드된 교재 파일 (로컬 개발용)
 uploads/
+
+*storybook.log
+storybook-static

@@ -1,25 +1,57 @@
 {
   "root": true,
   "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint", "local-rules"],
+  "plugins": [
+    "@typescript-eslint",
+    "local-rules"
+  ],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "prettier"
+    "prettier",
+    "plugin:storybook/recommended"
   ],
   "rules": {
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": "off",
-    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
-    "local-rules/no-direct-db-in-routes": ["error", {
-      "forbiddenSymbols": ["db"],
-      "allowedPathPatterns": ["/repositories/", "/services/", "/middleware/", "/__tests__/"]
-    }]
+    "no-console": [
+      "warn",
+      {
+        "allow": [
+          "warn",
+          "error",
+          "info"
+        ]
+      }
+    ],
+    "local-rules/no-direct-db-in-routes": [
+      "error",
+      {
+        "forbiddenSymbols": [
+          "db"
+        ],
+        "allowedPathPatterns": [
+          "/repositories/",
+          "/services/",
+          "/middleware/",
+          "/__tests__/"
+        ]
+      }
+    ]
   },
   "env": {
     "node": true,
     "es2022": true
   },
-  "ignorePatterns": ["dist/", "node_modules/", "*.js"]
+  "ignorePatterns": [
+    "dist/",
+    "node_modules/",
+    "*.js"
+  ]
 }
