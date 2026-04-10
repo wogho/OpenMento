@@ -96,7 +96,7 @@ function BookingCard({
       <div className="flex items-start justify-between gap-3 flex-wrap">
         {/* 헤더 */}
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg">🚨</span>
+          <span className="text-lg"></span>
           <div className="min-w-0">
             <p className="font-semibold text-gray-900 text-sm truncate">
               수강생 <code className="bg-gray-100 px-1 rounded text-xs">{shortId}…</code>
@@ -187,7 +187,7 @@ function MentalCareCard({
   return (
     <div className={`border rounded-xl p-4 bg-white shadow-sm transition-opacity ${message.isAdminRead ? 'opacity-50' : ''}`}>
       <div className="flex items-start gap-2">
-        <span className="text-lg shrink-0">💬</span>
+        <span className="text-lg shrink-0"></span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs text-gray-500">
@@ -196,7 +196,7 @@ function MentalCareCard({
               {new Date(message.createdAt).toLocaleString('ko-KR')}
             </p>
             {message.isAdminRead ? (
-              <span className="text-xs text-gray-400 font-medium">✓ 확인됨</span>
+              <span className="text-xs text-gray-400 font-medium"> 확인됨</span>
             ) : (
               <button
                 disabled={readMutation.isPending}
@@ -322,9 +322,9 @@ export default function EwsDashboard() {
 
   // ── 탭 정의 ───────────────────────────────────────────────────────────────
   const tabs: { id: EwsTab; label: string; icon: string }[] = [
-    { id: 'bookings', label: '상담 예약', icon: '📅' },
-    { id: 'messages', label: '멘탈케어 메시지', icon: '💬' },
-    { id: 'slack',    label: 'Slack 연동',    icon: '🔔' },
+    { id: 'bookings', label: '상담 예약', icon: '' },
+    { id: 'messages', label: '멘탈케어 메시지', icon: '' },
+    { id: 'slack',    label: 'Slack 연동',    icon: '' },
   ];
 
   return (
@@ -379,7 +379,7 @@ export default function EwsDashboard() {
           )}
           {!bookingLoading && bookings.length === 0 && !bookingError && (
             <div className="text-center py-12 text-gray-400">
-              <p className="text-4xl mb-2">🎉</p>
+              <p className="text-4xl mb-2"></p>
               <p className="font-medium">해당하는 상담 예약이 없습니다.</p>
             </div>
           )}
@@ -437,7 +437,7 @@ export default function EwsDashboard() {
           )}
           {!msgLoading && messages.length === 0 && !msgError && (
             <div className="text-center py-12 text-gray-400">
-              <p className="text-4xl mb-2">✅</p>
+              <p className="text-4xl mb-2"></p>
               <p className="font-medium">
                 {unreadOnly ? '미확인 메시지가 없습니다.' : '생성된 메시지가 없습니다.'}
               </p>
@@ -476,9 +476,9 @@ export default function EwsDashboard() {
             <div className="space-y-1">
               <p className="text-sm font-semibold text-gray-700">에스컬레이션 정책</p>
               <ul className="text-sm text-gray-600 space-y-1 list-none">
-                <li><span className="inline-block w-5 mr-1">⚠️</span>60~74점 — 담당 강사 채널 알림</li>
-                <li><span className="inline-block w-5 mr-1">🔴</span>75~89점 — 강사 + 원장 채널 + 멘탈케어 메시지</li>
-                <li><span className="inline-block w-5 mr-1">🚨</span>90~100점 — 전 단계 + 상담 예약 자동 생성</li>
+                <li><span className="inline-block w-5 mr-1">️</span>60~74점 — 담당 강사 채널 알림</li>
+                <li><span className="inline-block w-5 mr-1"></span>75~89점 — 강사 + 원장 채널 + 멘탈케어 메시지</li>
+                <li><span className="inline-block w-5 mr-1"></span>90~100점 — 전 단계 + 상담 예약 자동 생성</li>
               </ul>
             </div>
 
@@ -493,14 +493,14 @@ export default function EwsDashboard() {
                 {slackMutation.isPending ? (
                   <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
                 ) : (
-                  <span>⚡</span>
+                  <span></span>
                 )}
                 Slack 테스트 메시지 발송
               </button>
 
               {slackResult && (
                 <p className={`text-sm font-medium ${slackResult.ok ? 'text-green-600' : 'text-red-500'}`}>
-                  {slackResult.ok ? '✅ ' : '❌ '}{slackResult.msg}
+                  {slackResult.ok ? ' ' : ' '}{slackResult.msg}
                 </p>
               )}
             </div>

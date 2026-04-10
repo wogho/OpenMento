@@ -12,7 +12,7 @@ export default function TypingIndicator() {
     <div className="flex items-start gap-2 mb-1 px-3">
       {/* AI 아바타 */}
       <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--header-bg)] flex items-center justify-center text-sm">
-        🤖
+        
       </div>
 
       <div className="flex flex-col gap-1">

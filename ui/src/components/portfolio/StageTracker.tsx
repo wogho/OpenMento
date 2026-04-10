@@ -29,10 +29,10 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: 1, label: '페르소나 인터뷰', icon: '🎭', stages: ['interview'] },
-  { id: 2, label: '기획서 작성',     icon: '📝', stages: ['planning', 'hitl_review'] },
-  { id: 3, label: '보안 검토',       icon: '🔒', stages: ['security_review'] },
-  { id: 4, label: '독창성 인증',     icon: '✅', stages: ['similarity_check', 'approved'] },
+  { id: 1, label: '페르소나 인터뷰', icon: '', stages: ['interview'] },
+  { id: 2, label: '기획서 작성',     icon: '', stages: ['planning', 'hitl_review'] },
+  { id: 3, label: '보안 검토',       icon: '', stages: ['security_review'] },
+  { id: 4, label: '독창성 인증',     icon: '', stages: ['similarity_check', 'approved'] },
 ];
 
 function resolveStepIndex(stage: PortfolioStage): number {
@@ -72,7 +72,7 @@ export default function StageTracker({ stage, className = '' }: Props) {
                                     'bg-gray-100 text-gray-400'}
                   `}
                 >
-                  {isCompleted ? '✓' : step.icon}
+                  {isCompleted ? '' : step.icon}
                 </div>
                 <span
                   className={`
@@ -114,7 +114,7 @@ export default function StageTracker({ stage, className = '' }: Props) {
       )}
       {stage === 'abandoned' && (
         <div className="mt-4 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <span className="text-red-400 text-lg">⚠️</span>
+          <span className="text-red-400 text-lg">️</span>
           <p className="text-sm text-red-800 font-medium">
             세션이 만료되었습니다. 새로운 포트폴리오 워크플로우를 시작해 주세요.
           </p>

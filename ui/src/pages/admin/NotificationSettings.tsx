@@ -77,7 +77,7 @@ export default function NotificationSettings() {
       {/* Slack 설정 */}
       <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
         <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-          💬 Slack 알림 채널
+           Slack 알림 채널
         </h2>
 
         {isLoading ? (
@@ -132,7 +132,7 @@ export default function NotificationSettings() {
             </div>
 
             {saveMutation.isSuccess && (
-              <p className="text-sm text-green-600">✅ URL이 저장되었습니다.</p>
+              <p className="text-sm text-green-600"> URL이 저장되었습니다.</p>
             )}
             {saveMutation.isError && (
               <p className="text-sm text-red-500">저장 중 오류가 발생했습니다.</p>
@@ -145,7 +145,7 @@ export default function NotificationSettings() {
                     : 'bg-red-50 text-red-700 border border-red-200'
                 }`}
               >
-                {testResult.ok ? '✅' : '❌'} {testResult.msg}
+                {testResult.ok ? '' : ''} {testResult.msg}
               </div>
             )}
           </>
@@ -155,7 +155,7 @@ export default function NotificationSettings() {
       {/* 에스컬레이션 정책 안내 */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-2">
         <h3 className="text-sm font-bold text-amber-800 flex items-center gap-2">
-          📣 에스컬레이션 정책
+           에스컬레이션 정책
         </h3>
         <ul className="text-xs text-amber-700 space-y-1.5 list-disc ml-4">
           <li>EWS 점수가 설정된 <strong>Slack 에스컬레이션 기준</strong> 이상이면 즉시 알림 전송</li>
@@ -167,7 +167,7 @@ export default function NotificationSettings() {
 
       {/* 향후 알림 채널 확장 안내 */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-        <h3 className="text-sm font-medium text-gray-600 mb-2">📌 향후 지원 예정</h3>
+        <h3 className="text-sm font-medium text-gray-600 mb-2"> 향후 지원 예정</h3>
         <div className="flex flex-wrap gap-2">
           {['이메일 알림 (Phase 3)', 'SMS 알림 (Phase 4)', 'LMS 연동 (Phase 5)'].map((item) => (
             <span key={item} className="text-xs bg-gray-100 text-gray-500 px-3 py-1. rounded-lg">

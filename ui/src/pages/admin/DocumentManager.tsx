@@ -145,7 +145,7 @@ export default function DocumentManager() {
         >
           <input {...getInputProps()} />
           <div className="flex flex-col items-center justify-center gap-3">
-            <span className="text-4xl">📄</span>
+            <span className="text-4xl"></span>
             <div>
               <p className="text-gray-700 font-medium">
                 {isDragActive ? '여기에 PDF 파일을 놓아주세요' : 'PDF 교재 파일을 드래그하여 놓거나 클릭하여 선택하세요'}
@@ -159,7 +159,7 @@ export default function DocumentManager() {
         {/* 거절 파일 인라인 에러 */}
         {dropError && (
           <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-            ⚠️ {dropError}
+            ️ {dropError}
           </p>
         )}
       </section>
@@ -211,7 +211,7 @@ export default function DocumentManager() {
       <section>
         <h2 className="text-lg font-semibold text-gray-800 mb-3">등록된 교재 목록</h2>
         {listError && (
-          <p className="mb-2 text-sm text-red-600 flex items-center gap-1">⚠️ {listError}</p>
+          <p className="mb-2 text-sm text-red-600 flex items-center gap-1">️ {listError}</p>
         )}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <ul className="divide-y divide-gray-100">
@@ -221,7 +221,7 @@ export default function DocumentManager() {
               documents.map((doc) => (
                 <li key={doc.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition">
                   <div className="flex items-center gap-3 overflow-hidden">
-                    <span className="text-2xlshrink-0">📖</span>
+                    <span className="text-2xlshrink-0"></span>
                     <div className="truncate">
                       <p className="text-sm font-medium text-gray-900 truncate">{doc.filename}</p>
                       <p className="text-xs text-gray-400">등록일: {doc.createdAt}</p>
@@ -232,7 +232,7 @@ export default function DocumentManager() {
                     className="shrink-0 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
                     title="기록 삭제"
                   >
-                    🗑️
+                    ️
                   </button>
                 </li>
               ))

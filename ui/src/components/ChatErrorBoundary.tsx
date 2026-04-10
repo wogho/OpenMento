@@ -43,7 +43,7 @@ export default class ChatErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
-          <span className="text-4xl" role="img" aria-label="오류">⚠️</span>
+          <span className="text-4xl" role="img" aria-label="오류">️</span>
           <p className="font-semibold text-gray-700">메시지 렌더링에 실패했습니다.</p>
           <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
             일시적인 오류입니다. 아래 버튼을 눌러 다시 시도하거나

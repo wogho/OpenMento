@@ -50,11 +50,11 @@ function ConnectionBanner({ status }: { status: 'reconnecting' | 'disconnected' 
     >
       {isReconnecting ? (
         <>
-          <span className="inline-block animate-spin" aria-hidden="true">⟳</span>
+          <svg className="inline-block animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
           AI 서버와 재연결 중...
         </>
       ) : (
-        <>⚠️ AI 서버와 연결이 끊어졌습니다. 잠시 후 자동 재시도합니다.</>
+        <>연결이 끊어졌습니다. 잠시 후 자동 재시도합니다.</>
       )}
     </div>
   );
@@ -65,8 +65,8 @@ function ConnectionBanner({ status }: { status: 'reconnecting' | 'disconnected' 
 function EmptyState({ onExampleClick }: { onExampleClick: (q: string) => void }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 text-center px-8 gap-3">
-      <div className="w-16 h-16 rounded-2xl bg-white shadow flex items-center justify-center text-3xl">
-        📚
+      <div className="w-16 h-16 rounded-2xl bg-blue-50 shadow flex items-center justify-center">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       </div>
       <p className="text-base font-semibold text-gray-700">무엇이 궁금한가요?</p>
       <p className="text-sm text-gray-500 leading-relaxed">
@@ -125,7 +125,9 @@ export default function ChatPage() {
         style={{ background: 'var(--header-bg)' }}
       >
         <div className="flex items-center gap-2">
-          <span className="text-lg" role="img" aria-label="AI 튜터">🤖</span>
+          <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          </div>
           <div>
             <p className="text-sm font-semibold leading-tight">OpenMento AI 튜터</p>
             <p className="text-[11px] opacity-70 leading-tight">교재 기반 소크라테스식 답변</p>
@@ -139,9 +141,9 @@ export default function ChatPage() {
             onClick={() => navigate('/portfolio')}
             title="포트폴리오 기획서 작성"
             aria-label="포트폴리오 기획서 이동"
-            className="text-white/70 hover:text-white transition text-lg"
+            className="text-white/70 hover:text-white transition"
           >
-            🎓
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
           </button>
 
           {/* 새 대화 시작 */}
@@ -149,9 +151,9 @@ export default function ChatPage() {
             onClick={clearSession}
             title="새 대화 시작"
             aria-label="새 대화 시작"
-            className="text-white/70 hover:text-white transition text-lg"
+            className="text-white/70 hover:text-white transition"
           >
-            ✏️
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           </button>
 
           {/* 사용자 정보 + 로그아웃 */}
@@ -213,7 +215,7 @@ export default function ChatPage() {
         {error && (
           <div className="shrink-0 mx-3 mb-2">
             <div role="alert" aria-live="assertive" className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-600">
-              ⚠️ {error}
+              {error}
             </div>
           </div>
         )}

@@ -77,7 +77,7 @@ export default function InstructorDashboard() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {tab === 'students' ? '👥 수강생 현황' : '⚠️ 위험 수강생'}
+            {tab === 'students' ? ' 수강생 현황' : '️ 위험 수강생'}
             {tab === 'ews' && ewsQuery.data && ewsQuery.data.length > 0 && (
               <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
                 {ewsQuery.data.length}
@@ -162,7 +162,7 @@ export default function InstructorDashboard() {
           )}
           {ewsQuery.data && ewsQuery.data.length === 0 && (
             <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center text-green-700 text-sm">
-              ✅ 현재 위험 수강생이 없습니다.
+               현재 위험 수강생이 없습니다.
             </div>
           )}
           {ewsQuery.data?.map((s) => (

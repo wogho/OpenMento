@@ -54,9 +54,9 @@ interface AnalysisResult {
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
 
 const INDUSTRY_EMOJI: Record<string, string> = {
-  fintech: '🏦', healthcare: '🏥', ecommerce: '🛒',
-  education: '🎓', logistics: '🚚', entertainment: '🎬',
-  smart_city: '🏙️', hr: '💼', food: '🍽️', travel: '✈️',
+  fintech: '', healthcare: '', ecommerce: '',
+  education: '', logistics: '', entertainment: '',
+  smart_city: '️', hr: '', food: '️', travel: '️',
 };
 
 /** draft localStorage 키 (goalId별) */
@@ -380,7 +380,7 @@ export default function PortfolioPage() {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex flex-col">
         <header className="shrink-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
-          <h1 className="text-lg font-bold text-gray-800" aria-live="polite">📋 포트폴리오 기획서</h1>
+          <h1 className="text-lg font-bold text-gray-800" aria-live="polite"> 포트폴리오 기획서</h1>
         </header>
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
           이전 세션을 복구하는 중…
@@ -401,7 +401,7 @@ export default function PortfolioPage() {
         >
           ←
         </button>
-        <span className="text-lg font-bold text-gray-800">📋 포트폴리오 기획서</span>
+        <span className="text-lg font-bold text-gray-800"> 포트폴리오 기획서</span>
         {user?.name && (
           <span className="ml-auto text-xs text-gray-500">{user.name}</span>
         )}
@@ -421,7 +421,7 @@ export default function PortfolioPage() {
           {/* 에러 배너 */}
           {error && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700" role="alert" aria-live="assertive">
-              <span>⚠️</span>
+              <span>️</span>
               <span>{error}</span>
             </div>
           )}
@@ -437,7 +437,7 @@ export default function PortfolioPage() {
               transition={{ duration: 0.3 }}
               className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
               <div className="text-center space-y-2">
-                <div className="text-5xl mb-2">🤖</div>
+                <div className="text-5xl mb-2"></div>
                 <h2 className="text-xl font-bold text-gray-800">포트폴리오 기획서 워크플로우</h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   AI 고객 페르소나와 인터뷰를 진행하며 아이디어를 구체화하고,<br />
@@ -467,7 +467,7 @@ export default function PortfolioPage() {
                         `}
                       >
                         <span className="text-2xl mr-2">
-                          {INDUSTRY_EMOJI[p.industry] ?? '🤖'}
+                          {INDUSTRY_EMOJI[p.industry] ?? ''}
                         </span>
                         <span className="font-semibold text-sm text-gray-800">{p.name}</span>
                         {p.description && (
@@ -489,7 +489,7 @@ export default function PortfolioPage() {
                   transition-colors duration-150
                 "
               >
-                {isLoading ? '시작 중…' : '🚀 인터뷰 시작'}
+                {isLoading ? '시작 중…' : ' 인터뷰 시작'}
               </button>
             </motion.section>
           )}
@@ -531,7 +531,7 @@ export default function PortfolioPage() {
                     transition-colors duration-150
                   "
                 >
-                  📝 기획서 작성 단계로 이동
+                   기획서 작성 단계로 이동
                 </button>
               )}
             </motion.section>
@@ -547,14 +547,14 @@ export default function PortfolioPage() {
               transition={{ duration: 0.4 }}
               className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-gray-800">📝 기획서 작성</h2>
+                <h2 className="text-base font-bold text-gray-800"> 기획서 작성</h2>
                 <div className="flex items-center gap-3">
                   {/* 개선②: 자동 저장 상태 표시 */}
                   {draftSaveStatus === 'saving' && (
                     <span className="text-xs text-gray-400">저장 중…</span>
                   )}
                   {draftSaveStatus === 'saved' && (
-                    <span className="text-xs text-green-600 font-medium">✓ 자동 저장됨</span>
+                    <span className="text-xs text-green-600 font-medium"> 자동 저장됨</span>
                   )}
                   {/* 피드백 스타일 선택 */}
                   <div className="flex items-center gap-2 text-xs">
@@ -596,7 +596,7 @@ export default function PortfolioPage() {
               transition={{ duration: 0.5 }}
               className="space-y-4">
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
-                <h2 className="text-base font-bold text-gray-800">📊 독창성 분석 결과</h2>
+                <h2 className="text-base font-bold text-gray-800"> 독창성 분석 결과</h2>
                 <div id="portfolio-originality-gauge">
                 <OriginalityGauge
                   similarityScore={analysisResult.topSimilarity}
@@ -606,7 +606,7 @@ export default function PortfolioPage() {
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
-                <h3 className="text-sm font-bold text-gray-700">💬 AI 차별화 피드백</h3>
+                <h3 className="text-sm font-bold text-gray-700"> AI 차별화 피드백</h3>
                 <pre className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap font-sans bg-gray-50 rounded-xl p-4 border border-gray-100">
                   {analysisResult.feedbackText}
                 </pre>
@@ -632,7 +632,7 @@ export default function PortfolioPage() {
                     "
                     onClick={() => alert('강사에게 최종 승인을 요청합니다.')}
                   >
-                    ✅ 최종 승인 요청
+                     최종 승인 요청
                   </button>
                 )}
               </div>

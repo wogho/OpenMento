@@ -9,6 +9,7 @@ export interface JwtPayload {
   sub: string;           // userId (UUID)
   role: UserRole;
   institutionId: string; // 멀티 테넌트: 기관 격리 (super_admin은 'super' 고정값 사용)
+  name?: string;         // 표시 이름 (선택)
   iat?: number;
   exp?: number;
 }

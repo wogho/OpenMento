@@ -24,3 +24,4 @@ export * from './instructor_skills.js';
 export * from './goals.js';
 export * from './budget_policies.js'; // budgetPolicies, costEvents, modelPricing 포함
 export * from './onboarding_completions.js';
+export * from './admin_users.js';

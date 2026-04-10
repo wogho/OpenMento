@@ -23,7 +23,7 @@ export default function ChatBubble({ message, isStreaming }: ChatBubbleProps) {
           {formatTime(message.createdAt)}
         </span>
         <div
-          className="bubble-base bg-[var(--bubble-user)] rounded-br-sm"
+          className="bubble-base bg-[var(--bubble-user)] text-[var(--bubble-user-text)] rounded-br-sm"
           style={{ maxWidth: '75%' }}
         >
           <p className="whitespace-pre-wrap">{message.content}</p>
@@ -35,9 +35,9 @@ export default function ChatBubble({ message, isStreaming }: ChatBubbleProps) {
   // AI 메시지
   return (
     <div className="flex items-start gap-2 mb-1 px-3">
-      {/* AI 아바타 */}
+  // AI 아바타
       <div className="shrink-0 w-8 h-8 rounded-full bg-[var(--header-bg)] flex items-center justify-center text-sm mt-1">
-        🤖
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
       </div>
 
       <div className="flex flex-col gap-1 min-w-0" style={{ maxWidth: 'calc(100% - 2.5rem)' }}>

@@ -150,7 +150,7 @@ export default function ThresholdSettings() {
       <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-            ⚖️ EWS 점수 가중치
+            ️ EWS 점수 가중치
           </h2>
           <span
             className={`text-sm font-bold px-2 py-0.5 rounded-full ${
@@ -162,7 +162,7 @@ export default function ThresholdSettings() {
         </div>
 
         <SliderRow
-          label="📋 출결 가중치"
+          label=" 출결 가중치"
           value={form.attendanceWeight}
           onChange={update('attendanceWeight')}
           onCommit={autoSave}
@@ -170,7 +170,7 @@ export default function ThresholdSettings() {
           hint="출결 점수가 EWS 총점에 반영되는 비중"
         />
         <SliderRow
-          label="📝 과제 제출 가중치"
+          label=" 과제 제출 가중치"
           value={form.assignmentWeight}
           onChange={update('assignmentWeight')}
           onCommit={autoSave}
@@ -178,7 +178,7 @@ export default function ThresholdSettings() {
           hint="과제 제출율이 EWS 총점에 반영되는 비중"
         />
         <SliderRow
-          label="🔗 GitHub 커밋 가중치"
+          label=" GitHub 커밋 가중치"
           value={form.commitWeight}
           onChange={update('commitWeight')}
           onCommit={autoSave}
@@ -196,11 +196,11 @@ export default function ThresholdSettings() {
       {/* 위험 기준 섹션 */}
       <div className="bg-white rounded-2xl shadow-sm p-6 space-y-5">
         <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-          🎚️ 위험 판정 기준
+          ️ 위험 판정 기준
         </h2>
 
         <SliderRow
-          label="⚠️ 위험 판정 기준 점수"
+          label="️ 위험 판정 기준 점수"
           value={form.riskThreshold}
           onChange={update('riskThreshold')}
           onCommit={autoSave}
@@ -210,7 +210,7 @@ export default function ThresholdSettings() {
           hint={`이 점수 이상이면 '위험' 상태로 분류됩니다`}
         />
         <SliderRow
-          label="🚨 심각 판정 기준 점수"
+          label=" 심각 판정 기준 점수"
           value={form.criticalThreshold}
           onChange={update('criticalThreshold')}
           onCommit={autoSave}
@@ -220,7 +220,7 @@ export default function ThresholdSettings() {
           hint={`이 점수 이상이면 '심각' 상태로 분류됩니다`}
         />
         <SliderRow
-          label="📣 Slack 에스컬레이션 점수"
+          label=" Slack 에스컬레이션 점수"
           value={form.slackEscalateScore}
           onChange={update('slackEscalateScore')}
           onCommit={autoSave}
@@ -251,7 +251,7 @@ export default function ThresholdSettings() {
           <p className="text-sm text-red-500">{(mutation.error as Error).message}</p>
         )}
         {mutation.isSuccess && (
-          <p className="text-sm text-green-600">✅ 저장 완료</p>
+          <p className="text-sm text-green-600"> 저장 완료</p>
         )}
       </div>
     </div>

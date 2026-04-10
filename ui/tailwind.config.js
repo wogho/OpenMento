@@ -43,14 +43,20 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // 카카오톡 스타일 (Reused)
-        kakao: {
-          yellow: '#FEE500',
-          'yellow-dark': '#E6CE00',
+        // OpenMento 브랜드 색상 (전문적 블루 계열)
+        brand: {
+          50:  '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          900: '#1e3a5f',
         },
         bubble: {
-          user: '#FEE500',       // 본인 메시지
-          ai: '#FFFFFF',          // AI 메시지
+          user: '#2563eb',       // 본인 메시지: 파란색
+          'user-text': '#ffffff',
+          ai: '#FFFFFF',          // AI 메시지: 흰색
           'ai-dark': '#F8F8F8',
         },
       },

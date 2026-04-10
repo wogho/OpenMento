@@ -29,21 +29,21 @@ export interface InterviewMessage {
 
 // 산업군별 아바타 이모지
 const INDUSTRY_EMOJI: Record<string, string> = {
-  fintech:      '🏦',
-  healthcare:   '🏥',
-  ecommerce:    '🛒',
-  education:    '🎓',
-  logistics:    '🚚',
-  entertainment: '🎬',
-  smart_city:   '🏙️',
-  hr:           '💼',
-  food:         '🍽️',
-  travel:       '✈️',
+  fintech:      '',
+  healthcare:   '',
+  ecommerce:    '',
+  education:    '',
+  logistics:    '',
+  entertainment: '',
+  smart_city:   '️',
+  hr:           '',
+  food:         '️',
+  travel:       '️',
 };
 
 function getEmoji(industry?: string) {
-  if (!industry) return '🤖';
-  return INDUSTRY_EMOJI[industry] ?? '🤖';
+  if (!industry) return '';
+  return INDUSTRY_EMOJI[industry] ?? '';
 }
 
 interface Props {
@@ -133,7 +133,7 @@ export default function InterviewChat({
                 ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200 shadow-sm'}
               `}
             >
-              {msg.role === 'user' ? '👤' : emoji}
+              {msg.role === 'user' ? '' : emoji}
             </div>
 
             {/* 말풍선 */}
@@ -187,7 +187,7 @@ export default function InterviewChat({
       <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
         {isFinished ? (
           <p className="text-center text-sm text-gray-500 font-medium py-1">
-            ✅ 인터뷰가 종료되었습니다. 기획서 작성 단계로 진행하세요.
+             인터뷰가 종료되었습니다. 기획서 작성 단계로 진행하세요.
           </p>
         ) : (
           <div className="flex gap-2 items-end">

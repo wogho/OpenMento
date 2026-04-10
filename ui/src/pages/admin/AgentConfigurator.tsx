@@ -121,7 +121,7 @@ function AgentTreeNode({
             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs p-1 rounded transition shrink-0"
             title="삭제"
           >
-            🗑️
+            ️
           </button>
         </div>
       </li>
@@ -360,7 +360,7 @@ export default function AgentConfigurator() {
               </h2>
               <div className="flex items-center gap-2">
                 {successMsg && (
-                  <span className="text-xs text-green-600 font-medium animate-fade-in">✓ {successMsg}</span>
+                  <span className="text-xs text-green-600 font-medium animate-fade-in"> {successMsg}</span>
                 )}
                 {errorMsg && (
                   <span className="text-xs text-red-500">{errorMsg}</span>
@@ -460,12 +460,12 @@ export default function AgentConfigurator() {
                   {MODELS.map((m) => (
                     <option key={m.value} value={m.value}>
                       {m.label}
-                      {m.recommended?.includes(watchedRole) ? ' ★ 추천' : ''}
+                      {m.recommended?.includes(watchedRole) ? '  추천' : ''}
                     </option>
                   ))}
                 </select>
                 {MODELS.find((m) => m.value === watchedModel)?.recommended?.includes(watchedRole) && (
-                  <p className="text-xs text-green-600 mt-1">✓ 이 역할에 권장되는 모델입니다.</p>
+                  <p className="text-xs text-green-600 mt-1"> 이 역할에 권장되는 모델입니다.</p>
                 )}
               </div>
 
@@ -560,7 +560,7 @@ export default function AgentConfigurator() {
                   }}
                   className="text-xs text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition"
                 >
-                  🗑️ 에이전트 삭제
+                  ️ 에이전트 삭제
                 </button>
               </div>
             )}
@@ -568,7 +568,7 @@ export default function AgentConfigurator() {
         ) : (
           /* 선택 전 빈 상태 */
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400 p-8">
-            <span className="text-5xl">🤖</span>
+            <span className="text-5xl"></span>
             <p className="font-medium text-gray-500">좌측에서 에이전트를 선택하세요</p>
             <p className="text-xs text-center max-w-xs">
               에이전트 이름, 역할, 모델, 예산, 스킬 파일을<br />

@@ -4,9 +4,9 @@
  * App.tsx 에 단 한 번 삽입하면 역할별·기능별 투어가 자동으로 실행됩니다.
  *
  * 투어 목록:
- *   🧭 기본 투어    — 역할(admin/instructor/student) 최초 로그인 시 자동 실행
- *   📋 포트폴리오 투어 — /portfolio 최초 방문 시 수강생에게 자동 실행 (Gemini ③)
- *   📊 EWS 투어     — /admin 최초 방문 시 admin/instructor 에게 자동 실행 (Gemini ③)
+ *    기본 투어    — 역할(admin/instructor/student) 최초 로그인 시 자동 실행
+ *    포트폴리오 투어 — /portfolio 최초 방문 시 수강생에게 자동 실행 (Gemini ③)
+ *    EWS 투어     — /admin 최초 방문 시 admin/instructor 에게 자동 실행 (Gemini ③)
  *
  * 투어 미실행 중에는 해당 페이지에서 플로팅 "다시 보기" 버튼이 표시됩니다.
  */
@@ -66,7 +66,7 @@ export default function OnboardingTour() {
               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
             "
           >
-            🧭
+            
           </button>
 
           {/* 포트폴리오 페이지에서만 표시 */}
@@ -84,7 +84,7 @@ export default function OnboardingTour() {
                 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2
               "
             >
-              📋
+              
             </button>
           )}
 
@@ -103,7 +103,7 @@ export default function OnboardingTour() {
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2
               "
             >
-              📊
+              
             </button>
           )}
         </div>

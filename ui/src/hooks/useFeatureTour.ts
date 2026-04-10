@@ -116,7 +116,7 @@ export function useFeatureTour(
         progressText: '{{current}} / {{total}}',
         nextBtnText: '다음 ›',
         prevBtnText: '‹ 이전',
-        doneBtnText: '시작하기 🚀',
+        doneBtnText: '시작하기 ',
         steps: scenario.steps,
         // ① 스텝 진입마다 서버에 진행 상태 동기화
         onHighlightStarted: (_el, _step, opts) => {

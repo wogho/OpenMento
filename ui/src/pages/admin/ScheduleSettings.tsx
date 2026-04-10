@@ -97,7 +97,7 @@ function RoutineCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-base">{routine.isActive ? '🟢' : '⚪'}</span>
+            <span className="text-base">{routine.isActive ? '' : ''}</span>
             <h3 className="font-semibold text-gray-800 text-sm">{routine.name}</h3>
           </div>
           {routine.description && (
@@ -131,7 +131,7 @@ function RoutineCard({
         )}
         {webhookTrigger && (
           <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-lg">
-            🔗 webhook: {webhookTrigger.webhookEvent ?? 'all'}
+             webhook: {webhookTrigger.webhookEvent ?? 'all'}
           </span>
         )}
       </div>
@@ -246,7 +246,7 @@ export default function ScheduleSettings() {
       {/* 요약 배너 */}
       <div className="bg-purple-50 border border-purple-200 rounded-xl px-5 py-3 flex items-center justify-between">
         <p className="text-sm text-purple-800 font-medium">
-          📅 루틴 스케줄 — 활성 <strong>{active}</strong> / 전체 <strong>{total}</strong>
+           루틴 스케줄 — 활성 <strong>{active}</strong> / 전체 <strong>{total}</strong>
         </p>
         <p className="text-xs text-purple-500">토글로 즉시 활성화/비활성화</p>
       </div>

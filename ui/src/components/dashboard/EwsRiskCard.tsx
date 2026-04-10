@@ -116,7 +116,7 @@ export function EwsRiskCard({
       {/* 헤더 */}
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-lg">⚠️</span>
+          <span className="text-lg">️</span>
           <div>
             <p className="font-semibold text-gray-800 text-sm">{name}</p>
             {student.githubRepo && (
@@ -161,7 +161,7 @@ export function EwsRiskCard({
               : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50'
           }`}
         >
-          📋 상담 예약
+           상담 예약
         </button>
         <button
           onClick={() => setSection(section === 'memo' ? null : 'memo')}
@@ -171,7 +171,7 @@ export function EwsRiskCard({
               : 'bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50'
           }`}
         >
-          💬 상담 메모
+           상담 메모
         </button>
         <button
           onClick={() => setSection(section === 'falsep' ? null : 'falsep')}
@@ -181,7 +181,7 @@ export function EwsRiskCard({
               : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
           }`}
         >
-          🚫 허위 양성
+           허위 양성
         </button>
       </div>
 
@@ -205,7 +205,7 @@ export function EwsRiskCard({
             <p className="text-xs text-red-500">{(bookingMutation.error as Error).message}</p>
           )}
           {bookingMutation.isSuccess && (
-            <p className="text-xs text-green-600">✅ 상담 예약이 생성되었습니다.</p>
+            <p className="text-xs text-green-600"> 상담 예약이 생성되었습니다.</p>
           )}
         </div>
       )}

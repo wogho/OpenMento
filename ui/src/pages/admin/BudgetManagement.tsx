@@ -155,7 +155,7 @@ function BudgetSettingsForm({
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-      <h3 className="text-base font-bold text-gray-800">💰 예산 설정</h3>
+      <h3 className="text-base font-bold text-gray-800"> 예산 설정</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* 예산 한도 */}
@@ -248,7 +248,7 @@ function BudgetSettingsForm({
         <p className="text-sm text-red-500">오류: {(mutation.error as Error).message}</p>
       )}
       {mutation.isSuccess && (
-        <p className="text-sm text-green-600">✅ 예산 정책이 저장되었습니다.</p>
+        <p className="text-sm text-green-600"> 예산 정책이 저장되었습니다.</p>
       )}
 
       <button
@@ -352,7 +352,7 @@ export default function BudgetManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900">💰 예산 관리</h2>
+          <h2 className="text-2xl font-extrabold text-gray-900"> 예산 관리</h2>
           <p className="text-sm text-gray-500 mt-0.5">{budget?.month ?? '-'} LLM 사용량 현황</p>
         </div>
         <div className="flex gap-2">
@@ -360,13 +360,13 @@ export default function BudgetManagement() {
           onClick={() => { setShowSettings((v) => !v); qc.invalidateQueries({ queryKey: ['adminBudget'] }); }}
           className="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
         >
-          {showSettings ? '▲ 닫기' : '⚙️ 예산 설정'}
+          {showSettings ? '▲ 닫기' : '️ 예산 설정'}
         </button>
         <button
           onClick={() => setShowPricing((v) => !v)}
           className="px-4 py-2 text-sm font-semibold rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 transition"
         >
-          {showPricing ? '▲ 닫기' : '📊 모델 단가'}
+          {showPricing ? '▲ 닫기' : ' 모델 단가'}
         </button>
         </div>
       </div>
@@ -383,7 +383,7 @@ export default function BudgetManagement() {
       {showPricing && (
         <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-gray-800">📊 모델 단가 관리</h3>
+            <h3 className="text-base font-bold text-gray-800"> 모델 단가 관리</h3>
             <button
               onClick={() => setEditingPricing({ provider: '', model: '', inputPer1k: 0, outputPer1k: 0, isActive: true })}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"

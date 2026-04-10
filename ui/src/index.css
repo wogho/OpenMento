@@ -125,10 +125,11 @@
   }
 
   :root {
-    --chat-bg: #b2c7d9;         /* 카카오톡 기본 배경색 */
-    --header-bg: #3b4a5c;       /* 헤더 배경 */
-    --bubble-user: #fef08a;     /* 본인 말풍선 */
-    --bubble-ai: #ffffff;       /* AI 말풍선 */
+    --chat-bg: #f1f5f9;         /* 전문적 라이트 그레이 배경 */
+    --header-bg: #1e3a5f;       /* 다크 네이비 헤더 */
+    --bubble-user: #2563eb;     /* 본인 말풍선: 파란색 */
+    --bubble-user-text: #ffffff;
+    --bubble-ai: #ffffff;       /* AI 말풍선: 흰색 */
   }
 }
 

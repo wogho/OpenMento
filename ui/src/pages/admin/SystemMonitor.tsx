@@ -239,14 +239,14 @@ function LogModal({
             </div>
           </div>
           <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition" onClick={onClose}>
-            ✕
+            
           </button>
         </div>
 
         {/* 검색 바 */}
         <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none"></span>
             <input
               type="text"
               placeholder="로그 내 키워드 검색..."
@@ -262,7 +262,7 @@ function LogModal({
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
                 onClick={() => setSearch('')}
               >
-                ✕
+                
               </button>
             )}
           </div>
@@ -319,7 +319,7 @@ function LogModal({
               navigator.clipboard?.writeText(log).catch(() => {/* clipboard 미지원 환경 무시 */});
             }}
           >
-            📋 전체 복사
+             전체 복사
           </button>
         </div>
       </div>
@@ -337,7 +337,7 @@ function RestartConfirmModal({ onConfirm, onClose }: { onConfirm: () => void; on
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
-          <span className="text-3xl">⚠️</span>
+          <span className="text-3xl">️</span>
           <div>
             <div className="font-bold text-gray-800">서비스 재시작 확인</div>
             <div className="text-sm text-gray-500 mt-1">
@@ -490,13 +490,13 @@ export default function SystemMonitor() {
             onClick={handleRefreshAll}
             className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition flex items-center gap-1.5"
           >
-            <span>🔄</span> 새로고침
+            <span></span> 새로고침
           </button>
           <button
             onClick={() => setShowRestartConfirm(true)}
             className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600 font-medium hover:bg-red-100 transition flex items-center gap-1.5"
           >
-            <span>⚡</span> 서비스 재시작
+            <span></span> 서비스 재시작
           </button>
         </div>
       </div>
@@ -723,7 +723,7 @@ export default function SystemMonitor() {
 
       {restartMutation.isSuccess && (
         <div className="fixed bottom-6 right-6 z-50 bg-orange-600 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-medium animate-fade-in">
-          ⚡ 재시작 예약됨 — 잠시 후 자동 재기동됩니다.
+           재시작 예약됨 — 잠시 후 자동 재기동됩니다.
         </div>
       )}
     </div>

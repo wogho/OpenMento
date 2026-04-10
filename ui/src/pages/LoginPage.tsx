@@ -41,10 +41,10 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* 로고 영역 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-kakao-yellow shadow-md mb-3">
-            <span className="text-2xl" role="img" aria-label="OpenMento">📚</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-blue-600 shadow-md mb-3">
+            <img src="/icons/icon-192.png" alt="OpenMento" className="w-11 h-11 rounded-lg" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">OpenMento</h1>
+          <h1 className="text-2xl font-bold text-gray-900">OpenMento</h1>
           <p className="text-sm text-gray-500 mt-1">AI 기반 소크라테스식 튜터</p>
         </div>
 
@@ -64,7 +64,7 @@ export default function LoginPage() {
                 autoComplete="email"
                 className={`
                   w-full rounded-xl border px-3 py-2.5 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-kakao-yellow focus:border-transparent
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                   transition
                   ${errors.email ? 'border-red-400' : 'border-gray-300'}
                 `}
@@ -90,7 +90,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 className={`
                   w-full rounded-xl border px-3 py-2.5 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-kakao-yellow focus:border-transparent
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                   transition
                   ${errors.password ? 'border-red-400' : 'border-gray-300'}
                 `}
@@ -117,8 +117,8 @@ export default function LoginPage() {
               type="submit"
               disabled={isLoading}
               className="
-                w-full bg-kakao-yellow hover:bg-kakao-yellow-dark
-                text-gray-800 font-semibold rounded-xl py-3 text-sm
+                w-full bg-blue-600 hover:bg-blue-700
+                text-white font-semibold rounded-xl py-3 text-sm
                 transition active:scale-[0.98]
                 disabled:opacity-60 disabled:cursor-not-allowed
                 mt-2

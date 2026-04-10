@@ -12,8 +12,13 @@
  * - 보안 키 관리 (SecretsManager)
  */
 
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard, GraduationCap, AlertTriangle, BookOpen, Brain,
+  Bot, Clock, SlidersHorizontal, Bell, Wallet, KeyRound, FileSliders,
+  Activity, MessageSquare, LogOut, Settings,
+} from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import DocumentManager from './admin/DocumentManager';
 import SecretsManager from './admin/SecretsManager';
@@ -65,20 +70,20 @@ export default function AdminPage() {
     navigate('/login', { replace: true });
   };
 
-  const tabs: { id: AdminTab; label: string; icon: string; group?: string }[] = [
-    { id: 'principal',     label: '원장 대시보드',   icon: '🏫', group: '대시보드' },
-    { id: 'instructor',    label: '강사 대시보드',   icon: '👨‍🏫', group: '대시보드' },
-    { id: 'ews',           label: 'EWS 대시보드',   icon: '🚨', group: '대시보드' },
-    { id: 'documents',     label: '교재 관리',       icon: '📚', group: '콘텐츠' },
-    { id: 'skills',        label: '스킬 파일 관리',  icon: '🧠', group: '콘텐츠' },
-    { id: 'agents',        label: '에이전트 설정',   icon: '🤖', group: '콘텐츠' },
-    { id: 'schedule',      label: '스케줄 설정',     icon: '📅', group: '설정' },
-    { id: 'thresholds',    label: 'EWS 임계치',      icon: '🎚️', group: '설정' },
-    { id: 'notifications', label: '알림 채널',       icon: '🔔', group: '설정' },
-    { id: 'budget',        label: '예산 관리',       icon: '💰', group: '설정' },
-    { id: 'secrets',            label: '보안 키 관리',       icon: '🔑', group: '설정' },
-    { id: 'portfolio-settings', label: '포트폴리오 설정',    icon: '📋', group: '설정' },
-    { id: 'system',             label: '시스템 모니터링',    icon: '📊', group: '시스템' },
+  const tabs: { id: AdminTab; label: string; icon: ReactNode; group?: string }[] = [
+    { id: 'principal',          label: '원장 대시보드',      icon: <LayoutDashboard size={16} />, group: '대시보드' },
+    { id: 'instructor',         label: '강사 대시보드',      icon: <GraduationCap size={16} />,   group: '대시보드' },
+    { id: 'ews',                label: 'EWS 대시보드',       icon: <AlertTriangle size={16} />,   group: '대시보드' },
+    { id: 'documents',          label: '교재 관리',          icon: <BookOpen size={16} />,        group: '콘텐츠' },
+    { id: 'skills',             label: '스킬 파일 관리',     icon: <Brain size={16} />,           group: '콘텐츠' },
+    { id: 'agents',             label: '에이전트 설정',      icon: <Bot size={16} />,             group: '콘텐츠' },
+    { id: 'schedule',           label: '스케줄 설정',        icon: <Clock size={16} />,           group: '설정' },
+    { id: 'thresholds',         label: 'EWS 임계치',         icon: <SlidersHorizontal size={16}/>,group: '설정' },
+    { id: 'notifications',      label: '알림 채널',          icon: <Bell size={16} />,            group: '설정' },
+    { id: 'budget',             label: '예산 관리',          icon: <Wallet size={16} />,          group: '설정' },
+    { id: 'secrets',            label: '보안 키 관리',       icon: <KeyRound size={16} />,        group: '설정' },
+    { id: 'portfolio-settings', label: '포트폴리오 설정',    icon: <FileSliders size={16} />,     group: '설정' },
+    { id: 'system',             label: '시스템 모니터링',    icon: <Activity size={16} />,        group: '시스템' },
   ];
 
   return (
@@ -87,7 +92,9 @@ export default function AdminPage() {
       <aside className="w-[80px] md:w-[240px] shrink-0 border-r border-gray-200 bg-white flex flex-col transition-all">
         {/* 브랜딩 */}
         <div className="h-16 flex items-center justify-center md:justify-start md:px-5 shrink-0 border-b border-gray-100">
-          <span className="text-2xl" role="img" aria-label="Logo">⚙️</span>
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <Settings size={16} className="text-white" />
+          </div>
           <span className="hidden md:inline-block ml-2 font-bold text-gray-800 tracking-tight">Admin Hub</span>
         </div>
 
@@ -106,7 +113,7 @@ export default function AdminPage() {
               `}
               title={tab.label}
             >
-              <span className="text-lg">{tab.icon}</span>
+              <span className="shrink-0">{tab.icon}</span>
               <span className="hidden md:inline-block">{tab.label}</span>
             </button>
           ))}
@@ -120,16 +127,16 @@ export default function AdminPage() {
             className="w-full flex items-center justify-center md:justify-start gap-2 p-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition mb-2"
             title="튜터 채팅 이동"
           >
-            <span>🤖</span>
-            <span className="hidden md:inline-block font-medium">수강생 라이동</span>
+            <MessageSquare size={15} className="shrink-0" />
+            <span className="hidden md:inline-block font-medium">수강생 화면으로</span>
           </button>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center md:justify-start gap-2 p-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition"
             title={`${user?.name ?? 'Admin'} · 로그아웃`}
           >
-            <span>🚪</span>
-            <span className="hidden md:inline-block font-medium">단기 로그아웃</span>
+            <LogOut size={15} className="shrink-0" />
+            <span className="hidden md:inline-block font-medium">로그아웃</span>
           </button>
         </div>
       </aside>

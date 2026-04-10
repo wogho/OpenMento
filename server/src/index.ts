@@ -10,6 +10,7 @@ import webhookRouter from './routes/webhook.js';
 import portfolioRouter from './routes/portfolio.js';
 import superAdminRouter from './routes/super-admin.js';
 import onboardingRouter from './routes/onboarding.js';
+import setupRouter from './routes/setup.js';
 import { createBullBoardRouter, BULL_BOARD_BASE_PATH } from './routes/bull-board.js';
 import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
@@ -80,6 +81,9 @@ app.get('/health', (_req, res) => {
 
 // ── 인증 라우터 (공개) ────────────────────────────────────
 app.use('/auth', authLimiter, authRouter);
+
+// ── 초기 설치 라우터 (공개, 미초기화 상태에만 동작) ────────────
+app.use('/setup', authLimiter, setupRouter);
 
 // ── RBAC 보호 라우터 ──────────────────────────────────────
 // plan.md 부록 B: /student/* /instructor/* /admin/* 라우트 분리

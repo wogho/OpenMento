@@ -27,19 +27,19 @@ interface Props {
 
 const VERDICT_META: Record<SimilarityVerdict, { label: string; color: string; bg: string; bar: string }> = {
   differentiation_required: {
-    label: '⚠️ 차별화 필수',
+    label: '️ 차별화 필수',
     color: 'text-red-700',
     bg:    'bg-red-50 border-red-200',
     bar:   'bg-red-500',
   },
   improvement_recommended: {
-    label: '💡 개선 권장',
+    label: ' 개선 권장',
     color: 'text-amber-700',
     bg:    'bg-amber-50 border-amber-200',
     bar:   'bg-amber-500',
   },
   originality_confirmed: {
-    label: '✅ 독창성 충족',
+    label: ' 독창성 충족',
     color: 'text-green-700',
     bg:    'bg-green-50 border-green-200',
     bar:   'bg-green-500',

@@ -133,27 +133,27 @@ export default function PrincipalDashboard() {
       {/* KPI 카드 그리드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          icon="👥"
+          icon=""
           label="전체 수강생"
           value={`${data.totalStudents}명`}
           accent="blue"
         />
         <KpiCard
-          icon="⚠️"
+          icon="️"
           label="위험 수강생"
           value={`${data.atRiskCount}명`}
           sub="최근 30일 EWS ≥ 60"
           accent={data.atRiskCount > 0 ? 'red' : 'green'}
         />
         <KpiCard
-          icon="💰"
+          icon=""
           label="이번 달 AI 비용"
           value={costStr}
           sub="cost_events 합계"
           accent="yellow"
         />
         <KpiCard
-          icon="📋"
+          icon=""
           label="이번 달 출결율"
           value={data.attendanceRate != null ? `${data.attendanceRate}%` : '—'}
           accent={
@@ -169,7 +169,7 @@ export default function PrincipalDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* EWS 위험도 트렌드 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-[360px]">
-          <h2 className="text-base font-bold text-gray-800 mb-4 h-6">📈 최근 6개월 EWS 위험도 트렌드</h2>
+          <h2 className="text-base font-bold text-gray-800 mb-4 h-6"> 최근 6개월 EWS 위험도 트렌드</h2>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
@@ -210,7 +210,7 @@ export default function PrincipalDashboard() {
 
         {/* 학생별 출결 분포 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-[360px]">
-          <h2 className="text-base font-bold text-gray-800 mb-4 h-6">📊 주간 출결 분포 현황</h2>
+          <h2 className="text-base font-bold text-gray-800 mb-4 h-6"> 주간 출결 분포 현황</h2>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -244,7 +244,7 @@ export default function PrincipalDashboard() {
       {/* 위험 수강생 목록 */}
       <div className="bg-white rounded-2xl shadow-sm p-6">
         <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <span>🚨</span> 최근 위험 수강생 Top 10
+          <span></span> 최근 위험 수강생 Top 10
           <span className="ml-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
             {data.atRiskCount}명
           </span>
@@ -252,7 +252,7 @@ export default function PrincipalDashboard() {
 
         {data.recentRiskStudents.length === 0 ? (
           <div className="text-center py-8 text-gray-400 text-sm">
-            ✅ 현재 위험 수강생이 없습니다.
+             현재 위험 수강생이 없습니다.
           </div>
         ) : (
           <div>

@@ -93,7 +93,7 @@ export default function PortfolioSettings() {
         throw new Error(json.error ?? '저장 실패');
       }
       setIsDirty(false);
-      setFeedback({ type: 'ok', msg: '✅ 설정이 저장되었습니다.' });
+      setFeedback({ type: 'ok', msg: ' 설정이 저장되었습니다.' });
     } catch (e) {
       setFeedback({ type: 'error', msg: (e as Error).message });
     } finally {
@@ -112,7 +112,7 @@ export default function PortfolioSettings() {
   return (
     <div className="max-w-xl space-y-7">
       <div>
-        <h2 className="text-lg font-bold text-gray-800">📋 포트폴리오 설정</h2>
+        <h2 className="text-lg font-bold text-gray-800"> 포트폴리오 설정</h2>
         <p className="mt-1 text-xs text-gray-500">
           유사도 검사 기준과 기본 AI 피드백 스타일을 구성합니다.
         </p>
@@ -120,7 +120,7 @@ export default function PortfolioSettings() {
 
       {/* ── 유사도 임계값 ─────────────────────────────────────────────────── */}
       <section className="bg-white rounded-2xl border border-gray-200 p-5 space-y-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-700">📏 유사도 임계값</h3>
+        <h3 className="text-sm font-bold text-gray-700"> 유사도 임계값</h3>
 
         {/* 위험(Critical) 슬라이더 */}
         <div className="space-y-2">
@@ -187,19 +187,19 @@ export default function PortfolioSettings() {
 
       {/* ── 피드백 스타일 ────────────────────────────────────────────────── */}
       <section className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-700">💬 기본 AI 피드백 스타일</h3>
+        <h3 className="text-sm font-bold text-gray-700"> 기본 AI 피드백 스타일</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             {
               value: 'direct' as const,
               label: '직접 제안',
-              icon: '🎯',
+              icon: '',
               desc: 'AI가 구체적인 개선안을 바로 제시합니다.',
             },
             {
               value: 'socratic' as const,
               label: '소크라테스식',
-              icon: '🤔',
+              icon: '',
               desc: '질문을 통해 학생 스스로 차별화를 발견하게 합니다.',
             },
           ].map(({ value, label, icon, desc }) => (
@@ -224,19 +224,19 @@ export default function PortfolioSettings() {
 
       {/* ── 비교 대상 범위 ────────────────────────────────────────────────── */}
       <section className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-700">🔍 비교 대상 범위</h3>
+        <h3 className="text-sm font-bold text-gray-700"> 비교 대상 범위</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
             {
               value: 'current_cohort' as const,
               label: '현 기수만',
-              icon: '🏫',
+              icon: '',
               desc: '같은 기수 수강생 프로젝트와만 비교합니다.',
             },
             {
               value: 'all' as const,
               label: '전체 수료생',
-              icon: '🗄️',
+              icon: '️',
               desc: '역대 모든 수료생 포트폴리오와 비교합니다.',
             },
           ].map(({ value, label, icon, desc }) => (
@@ -269,7 +269,7 @@ export default function PortfolioSettings() {
               : 'bg-red-50 border border-red-200 text-red-700'}
           `}
         >
-          <span>{feedback.type === 'ok' ? '✅' : '⚠️'}</span>
+          <span>{feedback.type === 'ok' ? '' : '️'}</span>
           <span>{feedback.msg}</span>
         </div>
       )}
@@ -284,7 +284,7 @@ export default function PortfolioSettings() {
           transition-colors duration-150
         "
       >
-        {isSaving ? '저장 중…' : '💾 설정 저장'}
+        {isSaving ? '저장 중…' : ' 설정 저장'}
       </button>
     </div>
   );

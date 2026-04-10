@@ -82,7 +82,7 @@ export default function SecretsManager() {
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            🔐 시스템 외부 연동 Key 저장소
+             시스템 외부 연동 Key 저장소
           </h2>
           <p className="text-sm text-gray-500 mt-1">
             환경 변수(`.env`)에 기재하지 않고 데이터베이스 내 암호화되어 안전하게 보관됩니다.
@@ -92,12 +92,12 @@ export default function SecretsManager() {
 
         {successMsg && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 text-sm font-medium">
-            ✅ {successMsg}
+             {successMsg}
           </div>
         )}
         {errorMsg && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2 text-sm font-medium">
-            ⚠️ {errorMsg}
+            ️ {errorMsg}
           </div>
         )}
 
