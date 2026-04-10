@@ -1447,3 +1447,42 @@ plan.md 5-3 시나리오 그대로 반영:
 | `tests/e2e/scenario-3-ews-threshold.spec.ts` | localStorage 키 `'authToken'` → `'educlip_token'`, mock 데이터 필드명 수정, strict mode `.first()` 추가 |
 
 **최종 테스트 현황**: **429개 단위 테스트 + 13개 E2E 테스트 전체 통과** / tsc 오류 0개 / 5개 패키지 빌드 성공
+## Phase 6 — 프로덕션 배포 및 운영 고도화 (Post-Launch)
+
+> **목표**: 실제 운영 환경(Production)으로 시스템을 이전하고 대규모 트래픽 병목을 방지하며, 데이터 기반 의사결정 체계를 구축한다.
+
+### 6-1. 부하 테스트 및 인프라 최적화 (Scale-out)
+* **API 및 WebSocket 부하 테스트**: `k6` 또는 `Artillery`를 활용해 동시 접속 수강생 500명 이상 규모의 LLM 채팅 및 RAG 임베딩 처리 한계점 테스트 및 튜닝.
+* **커넥션 풀링 다중화**: DB 부하 분산을 위한 `PgBouncer` 또는 RDS Proxy 도입 및 Redis Cluster/Sentinel 구성 검토.
+
+### 6-2. CI/CD 및 인프라 프로비저닝 (IaC)
+* **CI/CD 파이프라인**: GitHub Actions 또는 GitLab CI 빌드·캐싱·테스트 자동화 (현재 통과하는 429개 단위 테스트 및 Playwright E2E 기반 커밋/PR 보호).
+* **퍼블릭 클라우드 전환**: AWS ECS/Fargate 또는 GCP Cloud Run을 활용한 Serverless Container 오케스트레이션 구성. Terraform을 이용한 코드 기반 인프라 배포 적용.
+
+### 6-3. 텔레메트리(APM) 및 분산 추적 (Observability)
+* **시스템 추적 도구 통합**: Sentry, Datadog, 또는 OpenTelemetry를 연동하여 서버 사이드 에러, 메모리 릭, API Latency 및 쿼리 병목 구간 실시간 가시화.
+* **LLM 비용/토큰 최적화 대시보드**: OpenAI/Anthropic/Gemini 등 실질 API 사용률과 토큰 소비량을 모니터링하여 교육기관별 청구 모델 기준점 도출.
+
+### 6-4. 사용자 행동 기반 기능 개선 (Data Flywheel)
+* **행석 분석 툴 연동**: PostHog 또는 Mixpanel 도입을 통해 학생의 화면 체류 시간, 첫 질문까지 걸리는 시간, 포트폴리오 전환율 분석.
+* **EWS (조기경보시스템) 피드백 루프**: 시스템이 식별한 '중도 탈락 위험군' 학생이 실제로 탈락하는지, 아니면 AI 개입으로 회복하는지에 대한 정확률 튜닝.
+
+## Phase 6 — 프로덕션 배포 및 운영 고도화 (Post-Launch)
+
+> **목표**: 실제 운영 환경(Production)으로 시스템을 이전하고 대규모 트래픽 병목을 방지하며, 데이터 기반 의사결정 체계를 구축한다.
+
+### 6-1. 부하 테스트 및 인프라 최적화 (Scale-out)
+* **API 및 WebSocket 부하 테스트**: `k6` 또는 `Artillery`를 활용해 동시 접속 수강생 500명 이상 규모의 LLM 채팅 및 RAG 임베딩 처리 한계점 테스트 및 튜닝.
+* **커넥션 풀링 다중화**: DB 부하 분산을 위한 `PgBouncer` 또는 RDS Proxy 도입 및 Redis Cluster/Sentinel 구성 검토.
+
+### 6-2. CI/CD 및 인프라 프로비저닝 (IaC)
+* **CI/CD 파이프라인**: GitHub Actions 또는 GitLab CI 빌드·캐싱·테스트 자동화 (현재 통과하는 429개 단위 테스트 및 Playwright E2E 기반 커밋/PR 보호).
+* **퍼블릭 클라우드 전환**: AWS ECS/Fargate 또는 GCP Cloud Run을 활용한 Serverless Container 오케스트레이션 구성. Terraform을 이용한 코드 기반 인프라 배포 적용.
+
+### 6-3. 텔레메트리(APM) 및 분산 추적 (Observability)
+* **시스템 추적 도구 통합**: Sentry, Datadog, 또는 OpenTelemetry를 연동하여 서버 사이드 에러, 메모리 릭, API Latency 및 쿼리 병목 구간 실시간 가시화.
+* **LLM 비용/토큰 최적화 대시보드**: OpenAI/Anthropic/Gemini 등 실질 API 사용률과 토큰 소비량을 모니터링하여 교육기관별 청구 모델 기준점 도출.
+
+### 6-4. 사용자 행동 기반 기능 개선 (Data Flywheel)
+* **행석 분석 툴 연동**: PostHog 또는 Mixpanel 도입을 통해 학생의 화면 체류 시간, 첫 질문까지 걸리는 시간, 포트폴리오 전환율 분석.
+* **EWS (조기경보시스템) 피드백 루프**: 시스템이 식별한 '중도 탈락 위험군' 학생이 실제로 탈락하는지, 아니면 AI 개입으로 회복하는지에 대한 정확률 튜닝.
