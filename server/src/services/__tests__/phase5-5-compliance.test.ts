@@ -404,6 +404,7 @@ describe('[E] security-headers — OWASP A05 보안 헤더', () => {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function applyHeaders(nodeEnv = 'test') {
     const origNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = nodeEnv;

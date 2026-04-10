@@ -16,6 +16,7 @@
  *  ⑩ 서비스 재시작 엔드포인트 계약 검증
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import * as path from 'node:path';
@@ -148,7 +149,7 @@ describe('admin.ts 라우터 마운트', () => {
     expect(content).toMatch(/import\s+systemRouter\s+from\s+['"`]\.\/system\.js['"`]/);
   });
 
-  it('\/system 경로에 systemRouter를 마운트해야 한다', () => {
+  it('/system 경로에 systemRouter를 마운트해야 한다', () => {
     expect(content).toMatch(/router\.use\(\s*['"`]\/system['"`]\s*,\s*systemRouter\s*\)/);
   });
 });
@@ -214,7 +215,7 @@ describe('SystemMonitor.tsx UI 구조', () => {
     expect(content).toMatch(/RestartConfirmModal/);
   });
 
-  it('POST \/admin\/system\/restart 호출 코드가 있어야 한다', () => {
+  it('POST /admin/system/restart 호출 코드가 있어야 한다', () => {
     expect(content).toMatch(/\/admin\/system\/restart/);
     expect(content).toMatch(/method:\s*['"`]POST['"`]/);
   });

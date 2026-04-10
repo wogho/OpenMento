@@ -309,6 +309,7 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
         resourceId: 'c-999',
         institutionId: 'inst-a',
       });
+    // eslint-disable-next-line no-empty
     } catch {}
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
@@ -328,6 +329,7 @@ describe('③ assertTenantExists — RLS 컨텍스트 인식 404', () => {
         institutionId: 'inst-a',
         req: mockReq,
       });
+    // eslint-disable-next-line no-empty
     } catch {}
 
     const logArg = consoleSpy.mock.calls[0][1] as string;

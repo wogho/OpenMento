@@ -17,6 +17,7 @@ import { buildSystemPrompt } from './prompts.js';
 import { PostHog } from 'posthog-node';
 
 // ── PostHog Node 셋업 (Phase 6-3) ──────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const posthog = new PostHog(
   process.env.POSTHOG_API_KEY || 'phc_mock_node_key_for_educlip',
   { host: process.env.POSTHOG_HOST || 'https://app.posthog.com' }

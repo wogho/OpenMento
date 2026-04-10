@@ -44,8 +44,6 @@ import {
   conversationMessages,
   assignmentSubmissions,
   portfolioProjects,
-  auditLogs,
-  eq,
   and,
   sql,
   lt,

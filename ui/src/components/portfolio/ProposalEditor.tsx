@@ -7,7 +7,7 @@
  * - isAnalyzing 상태에서 분석 중 스피너 표시
  */
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
 interface Props {
   value: string;

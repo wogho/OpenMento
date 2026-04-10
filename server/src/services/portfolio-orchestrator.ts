@@ -31,7 +31,6 @@ import {
   agents,
   eq,
   and,
-  isNull,
   sql,
   desc,
 } from '@educlip/db';
@@ -229,6 +228,7 @@ async function checkAndIncrementIteration(goalId: string): Promise<boolean> {
 }
 
 // ── 헬퍼: sharedContext 로드 ─────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function loadContext(goalId: string): Promise<SharedContext> {
   const [goal] = await db
     .select({ sharedContext: goals.sharedContext })
@@ -399,7 +399,8 @@ export async function startPortfolioWorkflow(
 export async function advanceWorkflow(
   options: AdvanceWorkflowOptions,
 ): Promise<WorkflowState> {
-  const { goalId, studentId, userMessage } = options;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { goalId, studentId: _studentId, userMessage } = options;
 
   // 1. 현재 상태 로드
   const [goalRow] = await db
@@ -912,6 +913,7 @@ async function handleSimilarityStage(
   try {
     // 임베딩 생성은 실제 배포 시 OpenAI text-embedding-3-small 사용
     // CI 환경에서 OPENAI_API_KEY 없을 수 있으므로 try-catch
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const embeddingResponse = await callLlm(
       adapter,
       [

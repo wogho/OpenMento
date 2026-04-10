@@ -57,7 +57,6 @@ export default function StageTracker({ stage, className = '' }: Props) {
         {STEPS.map((step, idx) => {
           const isCompleted = idx < currentIdx;
           const isActive    = idx === currentIdx && !isAbandoned;
-          const isFuture    = idx > currentIdx;
 
           return (
             <div key={step.id} className="flex items-center flex-1 last:flex-none">

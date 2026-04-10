@@ -552,6 +552,7 @@ describe('[개선③] processHitlReview — HITL 강사 승인/거부', () => {
 
 describe('[Workflow] PortfolioStage 타입 확장 검증', () => {
   it('hitl_review와 abandoned가 유효한 stage 값임을 typescript 타입으로 확인', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type, no-empty-pattern
     const { } = await import('../../services/portfolio-orchestrator.js');
     // 타입 레벨 검증: 컴파일 오류 없이 할당 가능
     const stages: import('../../services/portfolio-orchestrator.js').PortfolioStage[] = [

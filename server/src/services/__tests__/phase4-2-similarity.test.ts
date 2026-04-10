@@ -37,6 +37,7 @@ const {
   mockInsertReturning,
   mockUpdateSet,
   mockUpdateWhere,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   mockSelectFrom,
   mockSelectWhere,
   mockEmbedText,

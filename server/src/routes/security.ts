@@ -25,7 +25,6 @@ import {
   eq,
   sql,
   desc,
-  gte,
 } from '@educlip/db';
 import { auditPiiExposure } from '../services/anonymization-service.js';
 

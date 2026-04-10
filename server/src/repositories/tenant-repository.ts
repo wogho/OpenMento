@@ -24,13 +24,9 @@ import { withTenantContext } from '@educlip/db';
 import {
   db,
   students,
-  agents,
-  courses,
-  ragDocuments,
   ewsRiskScores,
   auditLogs,
   heartbeatRuns,
-  institutions,
   eq,
   desc,
   and,

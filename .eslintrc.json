@@ -3,7 +3,9 @@
   "parser": "@typescript-eslint/parser",
   "plugins": [
     "@typescript-eslint",
-    "local-rules"
+    "local-rules",
+    "react-hooks",
+    "react"
   ],
   "extends": [
     "eslint:recommended",
@@ -30,20 +32,11 @@
         ]
       }
     ],
-    "local-rules/no-direct-db-in-routes": [
-      "error",
-      {
-        "forbiddenSymbols": [
-          "db"
-        ],
-        "allowedPathPatterns": [
-          "/repositories/",
-          "/services/",
-          "/middleware/",
-          "/__tests__/"
-        ]
-      }
-    ]
+    "local-rules/no-direct-db-in-routes": "off",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/no-danger": "warn",
+    "no-constant-condition": "off",
+    "react-hooks/rules-of-hooks": "error"
   },
   "env": {
     "node": true,

@@ -37,9 +37,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type { NextFunction } from 'express';
 import { z } from 'zod';
 import { USER_ROLES } from '../../types/auth.js';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { UserRole, JwtPayload } from '../../types/auth.js';
 import { requireRole, requireSameInstitution } from '../../middleware/rbac.js';
 

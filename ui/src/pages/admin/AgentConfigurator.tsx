@@ -72,14 +72,6 @@ function modelProvider(modelValue: string): string {
   return MODELS.find((m) => m.value === modelValue)?.provider ?? 'openai';
 }
 
-function RecommendedBadge() {
-  return (
-    <span className="ml-1 text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-      추천
-    </span>
-  );
-}
-
 /* ─────────────────────── 에이전트 조직도 트리 노드 ─────────────────────── */
 
 function AgentTreeNode({
