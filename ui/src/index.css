@@ -148,3 +148,19 @@
     @apply flex items-end gap-2 px-3 py-2 bg-white border-t border-gray-200;
   }
 }
+
+/* 고대비 (High Contrast) 및 색약 (Color-blind) 접근성 모드 
+   data-theme="high-contrast" 속성이 root에 추가되면 활성화 
+*/
+:root[data-theme="high-contrast"],
+@media (prefers-contrast: more) {
+  :root {
+    --primary: 0 0% 0%; /* 흑백 대비 극대화 */
+    --primary-foreground: 0 0% 100%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --border: 0 0% 0%;
+    --ring: 0 0% 0%;
+    --destructive: 0 100% 30%; /* 가장 선명한 빨강 */
+  }
+}

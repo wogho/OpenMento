@@ -50,6 +50,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   return (
     <div className="chat-input-bar safe-area-pb">
       <textarea
+        autoFocus
         ref={textareaRef}
         value={text}
         onChange={handleChange}

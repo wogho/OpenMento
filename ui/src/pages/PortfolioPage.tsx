@@ -380,7 +380,7 @@ export default function PortfolioPage() {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex flex-col">
         <header className="shrink-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
-          <span className="text-lg font-bold text-gray-800">📋 포트폴리오 기획서</span>
+          <h1 className="text-lg font-bold text-gray-800" aria-live="polite">📋 포트폴리오 기획서</h1>
         </header>
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
           이전 세션을 복구하는 중…
@@ -420,7 +420,7 @@ export default function PortfolioPage() {
 
           {/* 에러 배너 */}
           {error && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700" role="alert" aria-live="assertive">
               <span>⚠️</span>
               <span>{error}</span>
             </div>
