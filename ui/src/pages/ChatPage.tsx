@@ -182,7 +182,7 @@ export default function ChatPage() {
         ) : (
           /* react-virtuoso 가상화: 수백 개 메시지도 DOM 20~30개만 렌더링 */
           <ChatErrorBoundary>
-            <Virtuoso aria-label="채팅 메시지 목록"<ChatMessage>
+            <Virtuoso aria-label="채팅 메시지 목록"
               style={{ flex: 1 }}
               data={visibleMessages}
               followOutput="smooth"
