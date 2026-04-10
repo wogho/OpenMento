@@ -2,7 +2,6 @@
 
 > **프로젝트명**: EduClip — 다중 에이전트 오케스트레이션 기반 AI 교육 자율 운영 플랫폼  
 > **기술 기반**: Node.js 20+ / TypeScript / PostgreSQL 16+ / pgvector / React 18+ / Docker Compose  
-> **참조 오픈소스**: [paperclip (MIT License)](https://github.com/paperclipai/paperclip) — DB 스키마·서비스 구조 직접 차용
 
 ---
 
@@ -15,6 +14,8 @@ Phase 2  ── EWS 위험 감지 시스템 (기능 2)           (3~4개월)
 Phase 3  ── Runtime Skill Injection AI 강사 (기능 1)(5~6개월)
 Phase 4  ── 포트폴리오 차별화 시스템 (기능 4)        (7~9개월)
 Phase 5  ── 고도화 및 다기관 확산                   (10개월~)
+Phase 6  ── 프로덕션 배포 및 운영 고도화            (11~12개월)
+Phase 7  ── 고충실도(Hi-Fi) UI/UX 고도화 및 디자인  (13개월~)
 ```
 
 ---
@@ -29,7 +30,7 @@ Phase 5  ── 고도화 및 다기관 확산                   (10개월~)
 ```
 our-project/
 ├── packages/
-│   ├── db/           # Drizzle ORM 스키마 (paperclip 차용 + 교육기관 도메인 추가)
+│   ├── db/           # Drizzle ORM 스키마 (교육기관 도메인 추가)
 │   ├── shared/       # 공유 타입 및 유틸리티
 │   └── rag/          # RAG 파이프라인 (pgvector 연동, 신규)
 ├── server/           # Node.js 20+ API + 에이전트 오케스트레이터
@@ -695,9 +696,9 @@ paperclip `agents.ts`의 `reportsTo` FK를 활용하여 계층 조직도 구성.
 | MCP 권한 제한 | Read-only 기본, Write는 Slack 알림 채널만 허용 | Phase 1 |
 | 감사 로그 | 에이전트 외부 접근 이력 전체 기록 + `/admin/security/audit-report` 리포트 API | Phase 1/5 |
 | 데이터 보존 | 수료 후 5년 자동 삭제 스케줄 (`data_retention` Heartbeat) | Phase 5 |
+| Webhook 보안 | GitHub Webhook HMAC-SHA256 서명 검증 | Phase 2 |
 | OWASP 헤더 | CSP·HSTS·X-Frame·Referrer-Policy 등 7종 보안 헤더 미들웨어 | Phase 5 |
 | PII 익명화 | `anonymizeDisplayName` 마스킹 + `redactStudentForAi` AI 전달 전 PII 제거 | Phase 5 |
-| Webhook 보안 | GitHub Webhook HMAC-SHA256 서명 검증 | Phase 2 |
 
 ---
 
@@ -930,7 +931,7 @@ github api
 - `(institutionId UUID FK, settingKey text)` UNIQUE 복합키, `settingValue jsonb`
 - `settingKey = 'portfolio'` → `PortfolioSettings` JSON
 - `settingKey = 'secrets'` → `{ openaiApiKey?, anthropicApiKey?, slackWebhookUrl? }` JSON
-- ✅ Phase 5-5 완료: `secrets-encryption.ts` pgcrypto `pgp_sym_encrypt/decrypt` 컬럼 레벨 암호화 구현
+- ⚠️ Phase 5-5: secrets 컬럼 레벨 pgcrypto 암호화 예정
 
 #### J-2. `institution-settings-service.ts` Write-Through 캐시 서비스 신설
 - `ews-thresholds.ts`와 동일한 패턴: in-memory Map + DB UPSERT + 서버 기동 프리워밍
@@ -1359,194 +1360,79 @@ plan.md 5-3 시나리오 그대로 반영:
 
 ---
 
-## 부록 N. Phase 5-4 개선 반영 이력 (2026-04-09)
+## Phase 6 — 프로덕션 배포 및 운영 고도화
 
-> Phase 5-4 완료 검증 후 보안·안정성·UX 취약점 3가지를 즉시 반영하였습니다.
+> **목표**: 상용 B2B 서비스 수준의 확장성(Scale-out), 모니터링, 무중단 배포 파이프라인을 구축한다.
+> **기간**: 11~12개월차
 
-### N-1. [보안] Socket.io Admin 룸 JWT 인증 강화 ✅
+### 6-1. CI/CD 파이프라인 고도화
 
-| 항목 | 내용 |
-|---|---|
-| **문제** | Socket.io `admin:*` 룸에 비관리자 클라이언트가 임의 진입하여 `agent:status_change` 이벤트 수신 가능 우려 |
-| **해결 ①** | `io.of('/').adapter.on('join-room', ...)` 어댑터 레벨 가드 추가 — `admin:*` 룸 진입 시 `socket.data.role !== 'admin'` 검사 후 즉시 `socket.leave()` + 경고 로그 출력 |
-| **해결 ②** | `join_session` 이벤트 핸들러에 sessionId 포맷 화이트리스트 검증 추가 — `/^[a-zA-Z0-9_-]+$/` (영숫자·하이픈·언더스코어, 1~128자) 이외 값 거부 → `admin:`, `student:` 등 보호 룸 네임스페이스 우회 시도 차단 |
-| **보안 계층** | JWT 미들웨어(1차) + 어댑터 룸 가드(2차) 이중화로 토큰 위변조 방어 강화 |
+**작업 항목**:
+- [x] CI/CD 파이프라인(GitHub Actions 중심) 스캐폴딩 생성
+- [x] PR 생성 시 Unit/E2E 테스트, 린트, 타입 체크가 통과되어야 Merge 가능한 규칙 설정
+- [x] 테스트 커버리지 리포트 자동 생성 및 PR 코멘트 봇 연동
+- [x] Docker 컨테이너 이미지 병렬 빌드 캐싱 최적화
+- [x] AWS ECR / GCP Artifact Registry 이미지 푸시 자동화
+- [x] 트래픽 분산 및 롤백 보장을 위한 Blue/Green 혹은 Canary 배포 전략 구현
 
-**수정 파일**: `server/src/socket/chat.handler.ts`
+### 6-2. Observability (관측성) 및 APM 구축
 
----
+**작업 항목**:
+- [ ] Datadog 또는 ELK 스택(Elasticsearch, Logstash, Kibana) 에이전트 서버 연동
+- [ ] 서버 CPU/Memory 사용량, API 응답시간, DB 커넥션 풀 등 인프라 메트릭 대시보드화
+- [ ] AI 에이전트 Heartbeat 지연 시간 및 토큰 응답 속도 메트릭 추가
+- [ ] Sentry 연동을 통해 프런트/백엔드 미포착 예외 발생 시 실시간 Error 트래킹
+- [ ] 크리티컬 에러(HTTP 5xx, DB 연결 실패 등) 발생 시 담당자 Slack 자동 알림
 
-### N-2. [안정성] 헬스체크 API Cascading Failure 방지 ✅
+### 6-3. 프로덕트 데이터 분석(Analytics) 도구 도입
 
-| 항목 | 내용 |
-|---|---|
-| **문제** | DB/Redis가 Hang 상태일 때 `/admin/system/status` 폴링 요청이 무한 대기 → Node.js 이벤트 루프·커넥션 풀 고갈 위험 |
-| **해결** | `withTimeout<T>(promise, ms, fallback)` 유틸 신설 — `Promise.race([promise, timeout])` 패턴으로 지정 시간 초과 시 fallback 반환 |
-| **DB 타임아웃** | `DB_HEALTH_TIMEOUT_MS = 3000` — 3초 초과 시 `{ status: 'down', detail: '응답 없음 (3000ms 타임아웃)' }` 반환 |
-| **Redis 타임아웃** | `REDIS_HEALTH_TIMEOUT_MS = 2000` — 2초 초과 시 `{ status: 'down', detail: '응답 없음 (2000ms 타임아웃)' }` 반환 |
-| **ioredis 최적화** | `connectTimeout: 1500`, `maxRetriesPerRequest: 0` — 타임아웃 발생 시 재시도 없이 즉시 실패 처리하여 지연 최소화 |
+**작업 항목**:
+- [ ] PostHog 등 사용자 행동 분석 도구 SDK 프론트엔드 연동
+- [ ] 수강생의 체류 시간 및 AI 튜터 질문 전환율 퍼널(Funnel) 이벤트 정의
+- [ ] 강사용 프롬프트 템플릿 A/B 테스트 기반(플래그/세그먼트 연동) 인프라 마련
 
-**수정 파일**: `server/src/services/system-status.ts`
-
----
-
-### N-3. [UX/성능] 로그 뷰어 Tail-N + 키워드 검색 + 하이라이트 ✅
-
-| 항목 | 내용 |
-|---|---|
-| **문제** | `stdoutExcerpt` 가 MB 단위로 커질 경우 모달 열기 시 React UI 스레드 블로킹 |
-| **Tail-N 렌더링** | 기본 최근 200줄만 표시 (`LOG_CHUNK_SIZE = 200`) — 줄 번호 표시, "↑ 이전 N줄 더 보기" 버튼으로 청크 단위 추가 로드 |
-| **키워드 검색** | 검색 입력 시 매칭 줄만 필터링 + 검색 결과 줄 수 표시, 검색어 변경 시 visibleCount 초기화 |
-| **하이라이트** | `highlightKeyword()` 함수 — HTML 특수문자 이스케이프(XSS 방지) 후 키워드 `<mark>` 태그 감싸기, 정규식 특수문자 이스케이프 처리 |
-| **전체 복사** | "📋 전체 복사" 버튼 → `navigator.clipboard.writeText(log)` (미지원 환경 무시) |
-
-**수정 파일**: `ui/src/pages/admin/SystemMonitor.tsx`
-
----
-
-**테스트 현황**: 393개 전체 통과 (Phase 5-4 개선 신규 35개 포함) / tsc 오류 0개 (수정 파일 기준)
-
----
-
-## 부록 O. Phase 0-5 전체 검증 이력 (2026-04-09)
-
-> Phase 5-5 커밋 이후 전체 코드베이스 통합 검증을 수행하여 발견된 이슈를 일괄 수정하였습니다.
-
-### O-1. TypeScript 컴파일 오류 수정 (6개 파일)
-
-| 파일 | 오류 유형 | 수정 내용 |
-|---|---|---|
-| `phase4-1-orchestration.test.ts` | TS2352 타입 불일치 | `as ReturnType<...>` → `as unknown as ReturnType<...>` |
-| `phase5-2-improvements.test.ts` | TS2775 assertion 오류 | 동적 import → 정적 import 전환 |
-| `phase4-2-similarity.test.ts` | mock 반환 형태 불일치 | `{ rows: [...] }` → `[...]` (postgres.js 직접 배열 반환) |
-| `portfolio-orchestrator.ts` | 누락 필드 + 타입 오류 | `provider: adapter.provider` 추가, `result.rows` → `Array.from(result)` |
-| `portfolio-similarity.ts` | 타입 오류 3건 | `.rows[0]` 접근 수정, `signal` 파라미터 제거, `as any` 캐스팅 |
-| `system-status.ts` | TS2351 not constructable | `RedisClass as any` 패턴으로 우회 |
-
-**결과**: tsc `--noEmit` 오류 0개
-
-### O-2. 단위 테스트 전체 통과
-
-- **429/429** 통과 (Duration ≈ 3s)
-- `phase4-2-similarity.test.ts` 5개 실패 → mock 수정으로 해결
-
-### O-3. Docker / DB 수정
-
-| 항목 | 수정 내용 |
-|---|---|
-| `docker/init.sql` | `CREATE EXTENSION IF NOT EXISTS pgcrypto;` 추가 (Phase 5-5 요구사항) |
-| `packages/db/drizzle/0013_agent_role_data_retention.sql` | `ALTER TYPE "public"."agent_role" ADD VALUE IF NOT EXISTS 'data_retention';` 신규 생성 |
-| `packages/db/drizzle/meta/_journal.json` | 15개 엔트리(0000~0013) 정합성 복원 |
-
-### O-4. E2E 테스트 수정 (13/13 통과)
-
-| 파일 | 수정 내용 |
-|---|---|
-| `ui/src/pages/AdminPage.tsx` | `useLocation()` 기반 URL → 초기 탭 동기화 (`/admin/thresholds` → `thresholds` 탭) |
-| `tests/e2e/scenario-2-document-upload.spec.ts` | route mock 포트 필터 수정, `loginAs()` waitForURL 추가 |
-| `tests/e2e/scenario-3-ews-threshold.spec.ts` | localStorage 키 `'authToken'` → `'educlip_token'`, mock 데이터 필드명 수정, strict mode `.first()` 추가 |
-
-**최종 테스트 현황**: **429개 단위 테스트 + 13개 E2E 테스트 전체 통과** / tsc 오류 0개 / 5개 패키지 빌드 성공
-## Phase 6 — 프로덕션 배포 및 운영 고도화 (Post-Launch)
-
-> **목표**: 실제 운영 환경(Production)으로 시스템을 이전하고 대규모 트래픽 병목을 방지하며, 데이터 기반 의사결정 체계를 구축한다.
-
-### 6-1. 부하 테스트 및 인프라 최적화 (Scale-out)
-* **API 및 WebSocket 부하 테스트**: `k6` 또는 `Artillery`를 활용해 동시 접속 수강생 500명 이상 규모의 LLM 채팅 및 RAG 임베딩 처리 한계점 테스트 및 튜닝.
-* **커넥션 풀링 다중화**: DB 부하 분산을 위한 `PgBouncer` 또는 RDS Proxy 도입 및 Redis Cluster/Sentinel 구성 검토.
-
-### 6-2. CI/CD 및 인프라 프로비저닝 (IaC)
-* **CI/CD 파이프라인**: GitHub Actions 또는 GitLab CI 빌드·캐싱·테스트 자동화 (현재 통과하는 429개 단위 테스트 및 Playwright E2E 기반 커밋/PR 보호).
-* **퍼블릭 클라우드 전환**: AWS ECS/Fargate 또는 GCP Cloud Run을 활용한 Serverless Container 오케스트레이션 구성. Terraform을 이용한 코드 기반 인프라 배포 적용.
-
-### 6-3. 텔레메트리(APM) 및 분산 추적 (Observability)
-* **시스템 추적 도구 통합**: Sentry, Datadog, 또는 OpenTelemetry를 연동하여 서버 사이드 에러, 메모리 릭, API Latency 및 쿼리 병목 구간 실시간 가시화.
-* **LLM 비용/토큰 최적화 대시보드**: OpenAI/Anthropic/Gemini 등 실질 API 사용률과 토큰 소비량을 모니터링하여 교육기관별 청구 모델 기준점 도출.
-
-### 6-4. 사용자 행동 기반 기능 개선 (Data Flywheel)
-* **행석 분석 툴 연동**: PostHog 또는 Mixpanel 도입을 통해 학생의 화면 체류 시간, 첫 질문까지 걸리는 시간, 포트폴리오 전환율 분석.
-* **EWS (조기경보시스템) 피드백 루프**: 시스템이 식별한 '중도 탈락 위험군' 학생이 실제로 탈락하는지, 아니면 AI 개입으로 회복하는지에 대한 정확률 튜닝.
-
-## Phase 6 — 프로덕션 배포 및 운영 고도화 (Post-Launch)
-
-> **목표**: 실제 운영 환경(Production)으로 시스템을 이전하고 대규모 트래픽 병목을 방지하며, 데이터 기반 의사결정 체계를 구축한다.
-
-### 6-1. 부하 테스트 및 인프라 최적화 (Scale-out)
-* **API 및 WebSocket 부하 테스트**: `k6` 또는 `Artillery`를 활용해 동시 접속 수강생 500명 이상 규모의 LLM 채팅 및 RAG 임베딩 처리 한계점 테스트 및 튜닝.
-* **커넥션 풀링 다중화**: DB 부하 분산을 위한 `PgBouncer` 또는 RDS Proxy 도입 및 Redis Cluster/Sentinel 구성 검토.
-
-### 6-2. CI/CD 및 인프라 프로비저닝 (IaC)
-* **CI/CD 파이프라인**: GitHub Actions 또는 GitLab CI 빌드·캐싱·테스트 자동화 (현재 통과하는 429개 단위 테스트 및 Playwright E2E 기반 커밋/PR 보호).
-* **퍼블릭 클라우드 전환**: AWS ECS/Fargate 또는 GCP Cloud Run을 활용한 Serverless Container 오케스트레이션 구성. Terraform을 이용한 코드 기반 인프라 배포 적용.
-
-### 6-3. 텔레메트리(APM) 및 분산 추적 (Observability)
-* **시스템 추적 도구 통합**: Sentry, Datadog, 또는 OpenTelemetry를 연동하여 서버 사이드 에러, 메모리 릭, API Latency 및 쿼리 병목 구간 실시간 가시화.
-* **LLM 비용/토큰 최적화 대시보드**: OpenAI/Anthropic/Gemini 등 실질 API 사용률과 토큰 소비량을 모니터링하여 교육기관별 청구 모델 기준점 도출.
-
-### 6-4. 사용자 행동 기반 기능 개선 (Data Flywheel)
-* **행석 분석 툴 연동**: PostHog 또는 Mixpanel 도입을 통해 학생의 화면 체류 시간, 첫 질문까지 걸리는 시간, 포트폴리오 전환율 분석.
-* **EWS (조기경보시스템) 피드백 루프**: 시스템이 식별한 '중도 탈락 위험군' 학생이 실제로 탈락하는지, 아니면 AI 개입으로 회복하는지에 대한 정확률 튜닝.
+### Phase 6 완료 기준 (Definition of Done)
+- [ ] PR 코멘트에 E2E/단위 테스트 결과와 커버리지가 패스되어야만 배포 파이프라인이 진행됨
+- [ ] 신규 기능 배포 시 사용자의 접속이 끊기지 않는 무중단(Zero-downtime) 배포가 확인됨
+- [ ] 서버 내 500 에러 발생 시 지정된 Slack 알림 채널로 Sentry 에러 리포트가 수신됨을 확인
 
 ---
 
 ## Phase 7 — 고충실도(Hi-Fi) UI/UX 고도화 및 디자인 시스템 구축
 
-> **목표**: MVP 수준의 기능성 UI를 넘어, 상용 B2B SaaS 및 에듀테크 프로덕트 수준의 세련되고 일관된 모던 Web/App 디자인으로 업그레이드한다.
+> **목표**: 상용 SaaS 환경에 부합하는 세련된 UI/UX, 접근성, 및 시각적 반응성을 제공하는 프론트엔드 아키텍처를 완성한다.
+> **기간**: 13개월차~
 
-### 7-1. 디자인 시스템(Design System) 구축 및 테마 분리
-* **컴포넌트 라이브러리 규격화**: Radix UI 프리미티브에 기반한 Shadcn UI 컴포넌트를 고유 브랜드(EduClip) 가이드라인에 맞게 통일된 Radius, Spacing, Typography(Pretendard 혹은 기타 가독성 높은 폰트) 적용.
-* **Storybook 도입**: UI 컴포넌트를 독립적인 환경에서 개발 및 문서화하여, 프론트엔드 파편화 방지.
-* **커스텀 멀티-테넌시 테마(White-labeling)**: B2B로 도입하는 각 교육기관별로 로고, 주조색(Primary Color), 다크모드/라이트모드 테마가 자동 적용되도록 CSS Variables 기반 테마 스위처 구축.
+### 7-1. 전사적 디자인 시스템(Design System) 스캐폴딩
 
-### 7-2. 마이크로 인터랙션 및 애니메이션 (Micro-interactions)
-* **Framer Motion / Lottie 도입**: 모달 진입, 페이지 트랜지션, 탭 전환 시 딱딱하게 렌더링되는 대신, 물리 법칙 기반의 부드러운 스위시(Spring) 애니메이션 적용.
-* **AI 챗봇 체류 경험 고도화**:
-  - 답변 생성 중 메시지의 스켈레톤 UI (Pulse effect).
-  - LLM 스트리밍 청크가 타이핑되는 효과를 더욱 유려하게 처리.
-  - 마크다운 렌더링 시 코드 블록에 '단어 단위 하이라이팅(Code Hike 등)' 및 원클릭 복사 애니메이션 피드백(Tooltip/Checkmark) 추가.
-* **시각적 피드백 강화**: EWS 위험 임계치 저장, 교재 PDF 업로드 시 드래그 앤 드롭 존의 상태(호버, 에러, 완료) 변화를 명확하고 기분 좋게 렌더링.
+**작업 항목**:
+- [ ] Shadcn UI / Radix UI 라이브러리 설치 및 컴포넌트 환경 셋업
+- [ ] 모든 기존 HTML/Tailwind 코어 UI를 접근성 기반의 Headless 라이브러리 컴포넌트로 마이그레이션
+- [ ] Storybook 환경 구성 및 재사용 공통 컴포넌트(버튼, 모달, 폼 등) 문서화 / 시각적 회귀 테스트
+- [ ] CSS Variables 기반 화이트라벨링(White-labeling) 테마 엔진 구축 (B2B 납품 기관별 로고/브랜드 컬러 적용)
 
-### 7-3. 반응형 튜닝(Responsive) 및 접근성(A11y)
-* **모바일 퍼스트(Mobile-First) 대시보드 구조**:
-  - 관리자/강사 대시보드의 복잡한 테이블(위험 수강생 목록 등)을 모바일에서는 카드형 리스트 형태로 자연스럽게 접히도록(Collapse) 구성.
-  - 모달(Modal) 창 대신, 모바일 환경에서는 화면 하단에서 올라오는 Bottom Sheet 슬라이드 패턴 적용.
-* **접근성(Web Accessibility) 강화**:
-  - 스크린 리더(Screen Reader) 사용자(시각장애 등)를 위한 `aria-label`, `aria-live` 속성 전면 점검 및 보완.
-  - 마우스 없이 키보드(Tab 키 및 화살표)만으로 전체 관리자 설정(에이전트 생성, 임계치 슬라이더 조절)이 가능하도록 Focus Trap 및 Outline 고도화.
+### 7-2. 마이크로 인터랙션(Micro-interactions) 및 애니메이션 적용
 
-### 7-4. 매력적인 데이터 시각화 (Data Visualization Polish)
-* **고해상도 차트 라이브러리(Recharts / Visx)**:
-  - EWS (중도 탈락율) 대시보드와 비용/토큰 사용량 게이지(Budget)를 단순 텍스트나 기본 바 너머, Hover 툴팁 애니메이션이 포함된 도넛형/스플라인 차트로 구현.
-  - 포트폴리오 독창성 점수를 나타내는 'Originality Gauge'에 파티클 이펙트나 다이나믹 컬러 전환(Red → Yellow → Green) 적용.
+**작업 항목**:
+- [ ] Framer Motion을 도입하여 에이전트 단계 전환(기획서 작성 → 화면 전환 등) 시 매끄러운 트랜지션 적용
+- [ ] Lottie 라이브러리 추가 및 에이전트 "생각 중/처리 중" 상태 시 로딩/스켈레톤 햅틱 애니메이션 추가
+- [ ] Toast 메시지 및 버튼 클릭 액션 성공/실패 시 즉각적인 시각(Haptic) 피드백 설계 강화
 
----
+### 7-3. 데이터 시각화 (Data Visualization) 리뉴얼
 
-## Phase 7 — 고충실도(Hi-Fi) UI/UX 고도화 및 디자인 시스템 구축
+**작업 항목**:
+- [ ] Recharts / Visx(D3 래퍼) 라이브러리를 통해 대시보드 리뉴얼
+- [ ] EWS 위험도 트렌드, 학생별 출결 분포 등을 인터랙티브 그래프(Hover 시 데이터 수치 노출) 형태로 구현
+- [ ] 포트폴리오 유사도 피드백 데이터를 노드 분기(Network Graph) 혹은 레이더 차트 등 상호 작용 가능한 맵으로 시각화 개선
 
-> **목표**: MVP 수준의 기능성 UI를 넘어, 상용 B2B SaaS 및 에듀테크 프로덕트 수준의 세련되고 일관된 모던 Web/App 디자인으로 업그레이드한다.
+### 7-4. 웹 접근성(a11y) 구조 고도화
 
-### 7-1. 디자인 시스템(Design System) 구축 및 테마 분리
-* **컴포넌트 라이브러리 규격화**: Radix UI 프리미티브에 기반한 Shadcn UI 컴포넌트를 고유 브랜드(EduClip) 가이드라인에 맞게 통일된 Radius, Spacing, Typography(Pretendard 혹은 기타 가독성 높은 폰트) 적용.
-* **Storybook 도입**: UI 컴포넌트를 독립적인 환경에서 개발 및 문서화하여, 프론트엔드 파편화 방지.
-* **커스텀 멀티-테넌시 테마(White-labeling)**: B2B로 도입하는 각 교육기관별로 로고, 주조색(Primary Color), 다크모드/라이트모드 테마가 자동 적용되도록 CSS Variables 기반 테마 스위처 구축.
+**작업 항목**:
+- [ ] 탭(Tab) 키 이동만으로 포트폴리오 기획서 작성 및 AI 튜터 질문 등을 완수할 수 있는 포커스 트래핑 제어 완료
+- [ ] 스크린 리더 호환성을 위해 다이얼로그 팝업, 알림창 등에 `aria-live`, `aria-hidden` 등 올바른 ARIA 속성 주입 및 모니터링 적용
+- [ ] 고대비(High-contrast) 모드 지원 및 색약 사용자 접근성 테스트 
 
-### 7-2. 마이크로 인터랙션 및 애니메이션 (Micro-interactions)
-* **Framer Motion / Lottie 도입**: 모달 진입, 페이지 트랜지션, 탭 전환 시 딱딱하게 렌더링되는 대신, 물리 법칙 기반의 부드러운 스프링(Spring) 애니메이션 적용.
-* **AI 챗봇 체류 경험 고도화**:
-  - 답변 생성 중 메시지의 스켈레톤 UI (Pulse effect).
-  - LLM 스트리밍 청크가 타이핑되는 효과를 더욱 유려하게 처리.
-  - 마크다운 렌더링 시 코드 블록에 '단어 단위 하이라이팅' 및 원클릭 복사 애니메이션 피드백(Tooltip/Checkmark) 추가.
-* **시각적 피드백 강화**: EWS 위험 임계치 저장, 교재 PDF 업로드 시 드래그 앤 드롭 존의 상태(호버, 에러, 완료) 변화를 명확하고 기분 좋게 렌더링.
-
-### 7-3. 반응형 튜닝(Responsive) 및 접근성(A11y)
-* **모바일 퍼스트(Mobile-First) 대시보드 구조**:
-  - 관리자/강사 대시보드의 복잡한 테이블(위험 수강생 목록 등)을 모바일에서는 카드형 리스트 형태로 자연스럽게 접히도록(Collapse) 구성.
-  - 모달(Modal) 창 대신, 모바일 환경에서는 화면 하단에서 올라오는 Bottom Sheet 슬라이드 패턴 적용.
-* **접근성(Web Accessibility) 강화**:
-  - 스크린 리더(Screen Reader) 사용자(시각장애 등)를 위한 `aria-label`, `aria-live` 속성 전면 점검 및 보완.
-  - 마우스 없이 키보드(Tab 키 및 화살표)만으로 전체 관리자 설정(에이전트 생성, 임계치 슬라이더 조절)이 가능하도록 Focus Trap 및 Outline 고도화.
-
-### 7-4. 매력적인 데이터 시각화 (Data Visualization Polish)
-* **고해상도 차트 라이브러리(Recharts / Visx)**:
-  - EWS (중도 탈락율) 대시보드와 비용/토큰 사용량 게이지(Budget)를 단순 텍스트나 기본 바 너머, Hover 툴팁 애니메이션이 포함된 도넛형/스플라인 차트로 구현.
-  - 포트폴리오 독창성 점수를 나타내는 'Originality Gauge'에 파티클 이펙트나 다이나믹 컬러 전환(Red → Yellow → Green) 적용.
+### Phase 7 완료 기준 (Definition of Done)
+- [ ] 핵심 UI 디자인이 Storybook 상에 문서화되어 개별 테스트가 가능함
+- [ ] CSS Variables(Theme 파일) 변경만으로 포털 전체의 헤더 색상, 로고 등이 일괄 변경되는 멀티 테넌시 테마가 작동함
+- [ ] 마우스 클릭 없이 키패드 탭 입력만으로 E2E 시나리오(질문 작성 등)를 막힘없이 탐색 및 실행할 수 있음
