@@ -1518,3 +1518,35 @@ plan.md 5-3 시나리오 그대로 반영:
 * **고해상도 차트 라이브러리(Recharts / Visx)**:
   - EWS (중도 탈락율) 대시보드와 비용/토큰 사용량 게이지(Budget)를 단순 텍스트나 기본 바 너머, Hover 툴팁 애니메이션이 포함된 도넛형/스플라인 차트로 구현.
   - 포트폴리오 독창성 점수를 나타내는 'Originality Gauge'에 파티클 이펙트나 다이나믹 컬러 전환(Red → Yellow → Green) 적용.
+
+---
+
+## Phase 7 — 고충실도(Hi-Fi) UI/UX 고도화 및 디자인 시스템 구축
+
+> **목표**: MVP 수준의 기능성 UI를 넘어, 상용 B2B SaaS 및 에듀테크 프로덕트 수준의 세련되고 일관된 모던 Web/App 디자인으로 업그레이드한다.
+
+### 7-1. 디자인 시스템(Design System) 구축 및 테마 분리
+* **컴포넌트 라이브러리 규격화**: Radix UI 프리미티브에 기반한 Shadcn UI 컴포넌트를 고유 브랜드(EduClip) 가이드라인에 맞게 통일된 Radius, Spacing, Typography(Pretendard 혹은 기타 가독성 높은 폰트) 적용.
+* **Storybook 도입**: UI 컴포넌트를 독립적인 환경에서 개발 및 문서화하여, 프론트엔드 파편화 방지.
+* **커스텀 멀티-테넌시 테마(White-labeling)**: B2B로 도입하는 각 교육기관별로 로고, 주조색(Primary Color), 다크모드/라이트모드 테마가 자동 적용되도록 CSS Variables 기반 테마 스위처 구축.
+
+### 7-2. 마이크로 인터랙션 및 애니메이션 (Micro-interactions)
+* **Framer Motion / Lottie 도입**: 모달 진입, 페이지 트랜지션, 탭 전환 시 딱딱하게 렌더링되는 대신, 물리 법칙 기반의 부드러운 스프링(Spring) 애니메이션 적용.
+* **AI 챗봇 체류 경험 고도화**:
+  - 답변 생성 중 메시지의 스켈레톤 UI (Pulse effect).
+  - LLM 스트리밍 청크가 타이핑되는 효과를 더욱 유려하게 처리.
+  - 마크다운 렌더링 시 코드 블록에 '단어 단위 하이라이팅' 및 원클릭 복사 애니메이션 피드백(Tooltip/Checkmark) 추가.
+* **시각적 피드백 강화**: EWS 위험 임계치 저장, 교재 PDF 업로드 시 드래그 앤 드롭 존의 상태(호버, 에러, 완료) 변화를 명확하고 기분 좋게 렌더링.
+
+### 7-3. 반응형 튜닝(Responsive) 및 접근성(A11y)
+* **모바일 퍼스트(Mobile-First) 대시보드 구조**:
+  - 관리자/강사 대시보드의 복잡한 테이블(위험 수강생 목록 등)을 모바일에서는 카드형 리스트 형태로 자연스럽게 접히도록(Collapse) 구성.
+  - 모달(Modal) 창 대신, 모바일 환경에서는 화면 하단에서 올라오는 Bottom Sheet 슬라이드 패턴 적용.
+* **접근성(Web Accessibility) 강화**:
+  - 스크린 리더(Screen Reader) 사용자(시각장애 등)를 위한 `aria-label`, `aria-live` 속성 전면 점검 및 보완.
+  - 마우스 없이 키보드(Tab 키 및 화살표)만으로 전체 관리자 설정(에이전트 생성, 임계치 슬라이더 조절)이 가능하도록 Focus Trap 및 Outline 고도화.
+
+### 7-4. 매력적인 데이터 시각화 (Data Visualization Polish)
+* **고해상도 차트 라이브러리(Recharts / Visx)**:
+  - EWS (중도 탈락율) 대시보드와 비용/토큰 사용량 게이지(Budget)를 단순 텍스트나 기본 바 너머, Hover 툴팁 애니메이션이 포함된 도넛형/스플라인 차트로 구현.
+  - 포트폴리오 독창성 점수를 나타내는 'Originality Gauge'에 파티클 이펙트나 다이나믹 컬러 전환(Red → Yellow → Green) 적용.
