@@ -27,6 +27,7 @@ import TypingIndicator from '../components/TypingIndicator';
 import ChatInput from '../components/ChatInput';
 import posthog from 'posthog-js';
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 // Phase 1에서는 에이전트 ID를 환경변수 또는 고정값으로 사용
 // Phase 3에서 수강생 과정에 연결된 에이전트를 동적으로 조회하도록 교체

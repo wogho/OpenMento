@@ -21,6 +21,8 @@ import StageTracker, { type PortfolioStage } from '../components/portfolio/Stage
 import InterviewChat, { type InterviewMessage } from '../components/portfolio/InterviewChat';
 import ProposalEditor from '../components/portfolio/ProposalEditor';
 import OriginalityGauge, { type SimilarityVerdict } from '../components/portfolio/OriginalityGauge';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -236,6 +238,7 @@ export default function PortfolioPage() {
         setMessages([{ id: `init-${Date.now()}`, role: 'assistant', content: data.message }]);
       }
 
+      toast.success('인터뷰를 시작합니다!');
       setPhase('interview');
     } catch (e) {
       setError((e as Error).message);
@@ -331,7 +334,8 @@ export default function PortfolioPage() {
   };
 
   // ── 직접 기획서 단계로 이동 ────────────────────────────────────────────────
-  const handleSkipToProposal = () => setPhase('proposal');
+  const handleSkipToProposal = () => toast.success('인터뷰를 마치고 기획서 작성을 시작합니다.');
+      setPhase('proposal');
 
   // ── 유사도 분석 요청 ────────────────────────────────────────────────────────
   const handleAnalyze = async () => {
@@ -354,6 +358,7 @@ export default function PortfolioPage() {
 
       const data: AnalysisResult = await res.json();
       setAnalysisResult(data);
+      toast.success('분석이 완료되었습니다!');
       setPhase('result');
     } catch (e) {
       setError((e as Error).message);
@@ -421,9 +426,16 @@ export default function PortfolioPage() {
             </div>
           )}
 
+          <AnimatePresence mode="wait">
           {/* ── 시작 화면 ── */}
           {phase === 'start' && (
-            <section className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
+            <motion.section 
+              key="start"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5">
               <div className="text-center space-y-2">
                 <div className="text-5xl mb-2">🤖</div>
                 <h2 className="text-xl font-bold text-gray-800">포트폴리오 기획서 워크플로우</h2>
@@ -479,12 +491,18 @@ export default function PortfolioPage() {
               >
                 {isLoading ? '시작 중…' : '🚀 인터뷰 시작'}
               </button>
-            </section>
+            </motion.section>
           )}
 
           {/* ── 인터뷰 단계 ── */}
           {phase === 'interview' && workflow && (
-            <section id="portfolio-interview-chat" className="space-y-3">
+            <motion.section 
+              key="interview"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+              id="portfolio-interview-chat" className="space-y-3">
               <div className="h-[520px]">
                 <InterviewChat
                   messages={messages}
@@ -516,12 +534,18 @@ export default function PortfolioPage() {
                   📝 기획서 작성 단계로 이동
                 </button>
               )}
-            </section>
+            </motion.section>
           )}
 
           {/* ── 기획서 작성 단계 ── */}
           {phase === 'proposal' && (
-            <section className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
+            <motion.section 
+              key="proposal"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-bold text-gray-800">📝 기획서 작성</h2>
                 <div className="flex items-center gap-3">
@@ -559,12 +583,18 @@ export default function PortfolioPage() {
                 onAnalyze={() => void handleAnalyze()}
                 isAnalyzing={isAnalyzing}
               />
-            </section>
+            </motion.section>
           )}
 
           {/* ── 독창성 분석 결과 ── */}
           {phase === 'result' && analysisResult && (
-            <section className="space-y-4">
+            <motion.section 
+              key="result"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.5 }}
+              className="space-y-4">
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
                 <h2 className="text-base font-bold text-gray-800">📊 독창성 분석 결과</h2>
                 <div id="portfolio-originality-gauge">
@@ -606,8 +636,9 @@ export default function PortfolioPage() {
                   </button>
                 )}
               </div>
-            </section>
+            </motion.section>
           )}
+          </AnimatePresence>
         </div>
       </main>
     </div>
