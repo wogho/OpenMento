@@ -169,6 +169,13 @@
       "when": 1776023792030,
       "tag": "0023_romantic_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776071200000,
+      "tag": "0025_institution_settings",
+      "breakpoints": true
     }
   ]
 }
