@@ -175,7 +175,7 @@ export default function InstructorManagement() {
     setFormError(null);
     const payload = {
       ...form,
-      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      tags: form.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
     };
     addMutation.mutate(payload as unknown as NewInstructorForm);
   };
@@ -189,7 +189,7 @@ export default function InstructorManagement() {
   };
 
   const togglePermissionBit = (bit: number) => {
-    setEditPermissions((prev) => prev ^ bit);
+    setEditPermissions((prev: number) => prev ^ bit);
   };
 
   const closeModal = () => {
@@ -254,7 +254,7 @@ export default function InstructorManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {instructors?.map((inst) => (
+              {instructors?.map((inst: Instructor) => (
                 <tr key={inst.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="font-semibold text-gray-800 dark:text-white">{inst.name}</div>
