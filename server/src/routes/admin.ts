@@ -47,6 +47,7 @@ import {
   isNotNull,
 } from '@openmento/db';
 import { invalidateSkillCache, importSkillFromGitHub } from '../services/skill-injector.js';
+import { listBuiltinSkills } from '../services/skill-registry.js';
 import { hasCyclicParent } from '../services/agent-hierarchy.js';
 import { ConnectorRegistry } from '../mcp/registry.js';
 import { withAuditLog, logAgentChange } from '../mcp/audit.js';
@@ -1886,6 +1887,7 @@ const importGitHubSkillSchema = z.object({
 /**
  * GET /admin/skills
  * 기관 내 활성 스킬 목록을 조회합니다.
+ * 빌트인 스킬(server/src/skills/*.md)이 항상 상단에 포함됩니다.
  * 쿼리: ?agentId=<uuid>&courseId=<uuid>
  */
 router.get('/skills', async (req, res) => {
@@ -1906,17 +1908,29 @@ router.get('/skills', async (req, res) => {
     .where(and(...conditions))
     .orderBy(desc(instructorSkills.createdAt));
 
-  res.json({ skills: rows });
+  // agentId / courseId 필터가 없는 전체 목록 조회 시 빌트인 스킬을 앞에 추가
+  const builtins = (!agentId && !courseId) ? listBuiltinSkills() : [];
+
+  res.json({ skills: [...builtins, ...rows] });
 });
 
 /**
  * GET /admin/skills/:id
  * 특정 스킬의 상세 정보(마크다운 등을 포함)를 조회합니다.
+ * id가 'builtin:' 접두사로 시작하면 빌트인 스킬을 반환합니다.
  */
 router.get('/skills/:id', async (req, res) => {
   const { id } = req.params;
   const { institutionId } = req.user!;
-  
+
+  // 빌트인 스킬 조회
+  if (id.startsWith('builtin:')) {
+    const builtins = listBuiltinSkills();
+    const builtin = builtins.find((s) => s.id === id);
+    if (!builtin) return res.status(404).json({ error: '빌트인 스킬을 찾을 수 없습니다.' });
+    return res.json(builtin);
+  }
+
   const [skill] = await db
     .select()
     .from(instructorSkills)

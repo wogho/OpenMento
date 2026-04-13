@@ -232,6 +232,26 @@
   }
 }
 
+@layer utilities {
+  /*
+   * 다크모드 입력 요소 — 전역 기본 스타일
+   *
+   * 특이도 (0,1,1): .bg-white (0,1,0) 보다 높아서 하드코딩된 bg-white를 덮어씁니다.
+   * dark:bg-xxx 와 같이 명시된 Tailwind dark 변형 (0,2,0) 은 여전히 우선합니다.
+   */
+  .dark input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  .dark textarea,
+  .dark select {
+    background-color: hsl(var(--input));
+    color: hsl(var(--foreground));
+  }
+
+  .dark input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file'])::placeholder,
+  .dark textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+}
+
 @theme inline {
   @keyframes appear-zoom {
     0%   { opacity: 0; transform: scale(0.96); }

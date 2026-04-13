@@ -42,6 +42,32 @@ const ROLE_TO_FILE: Record<string, string> = {
   portfolio_reviewer:  'portfolio-reviewer.md',
 };
 
+// 빌트인 스킬 역할 → 표시 이름 매핑
+const ROLE_TO_TITLE: Record<string, string> = {
+  orchestrator:        'Orchestrator (기본)',
+  ai_instructor:       'AI Instructor (기본)',
+  ai_tutor:            'AI Tutor (기본)',
+  ews_monitor:         'EWS Monitor (기본)',
+  mental_care:         'Mental Care (기본)',
+  portfolio_reviewer:  'Portfolio Reviewer (기본)',
+};
+
+export interface BuiltinSkillMeta {
+  id: string;          // 'builtin:orchestrator' 형식
+  role: string;
+  title: string;
+  markdown: string;
+  tags: string[];
+  isActive: boolean;
+  isBuiltIn: true;
+  agentId: null;
+  courseId: null;
+  sourceRef: string;
+  sourceUrl: null;
+  updatedAt: string;
+  updatedBy: null;
+}
+
 // 인메모리 캐시: role → 마크다운 문자열
 const defaultSkillCache = new Map<string, string>();
 
@@ -90,6 +116,28 @@ export function getDefaultSkillByRole(role: string): string | null {
  */
 export function listLoadedSkillRoles(): string[] {
   return [...defaultSkillCache.keys()];
+}
+
+/**
+ * 로드된 모든 빌트인 스킬을 BuiltinSkillMeta 배열로 반환합니다.
+ * GET /admin/skills 에서 DB 스킬과 머지하기 위해 사용합니다.
+ */
+export function listBuiltinSkills(): BuiltinSkillMeta[] {
+  return [...defaultSkillCache.entries()].map(([role, markdown]) => ({
+    id: `builtin:${role}`,
+    role,
+    title: ROLE_TO_TITLE[role] ?? role,
+    markdown,
+    tags: ['기본 스킬'],
+    isActive: true,
+    isBuiltIn: true as const,
+    agentId: null,
+    courseId: null,
+    sourceRef: `builtin:${role}`,
+    sourceUrl: null,
+    updatedAt: new Date(0).toISOString(),
+    updatedBy: null,
+  }));
 }
 
 /**
