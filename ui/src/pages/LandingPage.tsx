@@ -15,6 +15,9 @@ export default function LandingPage() {
           <a href="/login/student" className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium px-4 py-2 rounded-xl hover:bg-gray-100/80 dark:hover:bg-slate-800/80 transition-all">
             수강생 로그인
           </a>
+          <a href="/setup" className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-4 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/50 transition-all">
+            기관 생성하기
+          </a>
           <a href="/login/admin" className="text-sm text-white bg-blue-600 hover:bg-blue-700 font-medium px-4 py-2 rounded-xl shadow-md shadow-blue-500/30 transition-all duration-200 hover:-translate-y-px">
             관리자 로그인
           </a>
@@ -26,7 +29,7 @@ export default function LandingPage() {
           title="AI 기반 맞춤형 교육 플랫폼"
           description="OpenMento는 강사와 수강생을 연결하는 엔터프라이즈급 AI 튜터링 플랫폼입니다. 소크라테스식 질문 응답과 실시간 EWS 모니터링으로 교육의 질을 높입니다."
           primaryCta={{ text: "수강생 포털 입장", href: "/login/student" }}
-          secondaryCta={{ text: "관리자 대시보드", href: "/login/admin" }}
+          secondaryCta={{ text: "기관 생성하기", href: "/setup" }}
           mockupImage={{
             src: "/dashboard-preview.png",
             alt: "OpenMento Dashboard",
