@@ -261,7 +261,22 @@ pnpm dev
 curl http://localhost:3000/health
 ```
 
-> 이후 재실행 시에는 DB 컨테이너가 꺼져 있을 경우 `docker compose -f docker/docker-compose.yml up -d db redis` 후 `pnpm dev`만 실행하면 됩니다.
+### 이후 재실행
+
+```bash
+docker compose -f docker/docker-compose.yml up -d db redis
+pnpm dev
+```
+
+### 접속
+
+| 용도 | 주소 |
+|------|------|
+| UI | http://localhost:5173 |
+| API 헬스체크 | http://localhost:3000/health |
+
+> 서버가 처음 뜨면 브라우저에서 초기 설정 마법사(`/setup`)가 자동으로 표시됩니다.  
+> 기관명, LLM API 키, 관리자 계정을 입력하면 설정이 완료됩니다.
 
 <br/>
 
