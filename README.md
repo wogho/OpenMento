@@ -196,24 +196,27 @@ OpenMento는 까다로운 오케스트레이션 세부 사항을 올바르게 �
 
 오픈소스. 자체 호스팅. 별도 계정 불필요.
 
+> **요구 사항:** Node.js 20+, pnpm 9.15+, Docker
+
 ```bash
 git clone https://github.com/wogho/OpenMento.git
-cd OpenMento/openmento
-pnpm install
-pnpm dev
+cd OpenMento
+cp .env.example .env        # JWT_SECRET, OPENAI_API_KEY 설정
+pnpm docker:up              # PostgreSQL + Redis + API + UI 전체 시작
+pnpm db:migrate             # DB 스키마 마이그레이션 적용
 ```
 
-API 서버는 `http://localhost:3100`에서 시작됩니다. 임베디드 PostgreSQL 데이터베이스가 자동으로 생성됩니다.
+브라우저에서 `http://localhost` 접속 → SetupPage에서 기관명·관리자 계정 생성 후 시작됩니다.
 
-> **요구 사항:** Node.js 20+, pnpm 9.15+
-
-또는 Docker를 사용하는 경우:
+**로컬 개발 환경:**
 
 ```bash
-cp .env.example .env
-pnpm docker:up
-pnpm db:migrate
-pnpm dev
+git clone https://github.com/wogho/OpenMento.git
+cd OpenMento
+cp .env.example .env        # DATABASE_URL, JWT_SECRET 설정
+docker compose -f docker/docker-compose.yml up -d db redis   # DB + Redis만 시작
+pnpm install
+pnpm dev                    # API: http://localhost:3100 / UI: http://localhost:5173
 ```
 
 <br/>
@@ -221,7 +224,7 @@ pnpm dev
 ## FAQ
 
 **일반적인 배포 구성은 어떻게 됩니까?**  
-로컬 환경에서는 단일 Node.js 프로세스가 임베디드 Postgres와 로컬 파일 스토리지를 관리합니다. 프로덕션 환경에서는 외부 Postgres를 연결하고 원하는 방식으로 배포합니다. 기관, 에이전트, 목표를 설정하면 에이전트들이 나머지를 처리합니다.
+`docker compose up` 한 번으로 PostgreSQL + Redis + API + UI + RAG Worker가 모두 시작됩니다. 프로덕션은 외부 PostgreSQL/Redis URL을 `.env`에 설정하면 동일하게 동작합니다.
 
 **여러 기관을 동시에 운영할 수 있습니까?**  
 네. 단일 배포 환경에서 완전한 데이터 격리를 유지하며 기관 수에 제한 없이 운영 가능합니다.
