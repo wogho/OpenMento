@@ -45,7 +45,7 @@ COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
 COPY --from=builder /app/packages/db/dist/ ./packages/db/dist/
 COPY --from=builder /app/packages/rag/dist/ ./packages/rag/dist/
 COPY --from=builder /app/packages/rag-worker/dist/ ./packages/rag-worker/dist/
-RUN pnpm install --prod
+RUN pnpm install --prod --ignore-scripts
 
 USER node
 CMD ["node", "packages/rag-worker/dist/index.js"]

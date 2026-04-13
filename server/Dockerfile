@@ -45,7 +45,7 @@ COPY --from=builder /app/packages/shared/dist/ ./packages/shared/dist/
 COPY --from=builder /app/packages/db/dist/ ./packages/db/dist/
 COPY --from=builder /app/packages/rag/dist/ ./packages/rag/dist/
 COPY --from=builder /app/server/dist/ ./server/dist/
-RUN pnpm install --prod
+RUN pnpm install --prod --ignore-scripts
 EXPOSE 3000
 USER node
 CMD ["node", "server/dist/index.js"]
