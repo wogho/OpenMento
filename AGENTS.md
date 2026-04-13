@@ -34,7 +34,15 @@ tests/e2e/       — Playwright E2E 테스트
 
 ## 4. 개발 환경 설정
 
-`DATABASE_URL`을 설정하지 않으면 임베디드 PostgreSQL을 사용합니다.
+`DATABASE_URL` 환경변수가 **필수**입니다. Docker Compose로 로컬 DB를 올리거나 Supabase/Neon 등 외부 PostgreSQL URL을 `.env`에 지정하세요.
+
+```sh
+# Docker로 로컬 PostgreSQL 시작
+docker compose up -d
+
+# 또는 .env에 외부 DATABASE_URL 직접 지정
+cp .env.example .env
+```
 
 ```sh
 pnpm install
@@ -44,7 +52,7 @@ pnpm dev
 시작되는 서비스:
 
 - API: `http://localhost:3100`
-- UI: `http://localhost:3100` (API 서버가 개발 미들웨어 모드로 서빙)
+- UI: `http://localhost:5173/` (Vite dev server)
 
 빠른 헬스 체크:
 
@@ -55,7 +63,8 @@ curl http://localhost:3100/api/health
 로컬 개발 DB 초기화:
 
 ```sh
-rm -rf data/pglite
+# docker-compose 사용 시
+docker compose down -v && docker compose up -d
 pnpm dev
 ```
 

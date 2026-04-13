@@ -2,31 +2,27 @@
 
 OpenMento은 [Drizzle ORM](https://orm.drizzle.team/)을 통해 PostgreSQL을 사용합니다. 간단한 방법부터 프로덕션 수준까지 세 가지 실행 방법을 지원합니다.
 
-## 1. 임베디드 PostgreSQL — 설정 불필요
+## 1. 로컬 PostgreSQL (Docker) — 권장
 
-`DATABASE_URL`을 설정하지 않으면 서버가 자동으로 임베디드 PostgreSQL 인스턴스를 시작하고 로컬 데이터 디렉터리를 관리합니다.
+`DATABASE_URL` 환경변수가 **필수**입니다. 설정되지 않으면 `packages/db/src/client.ts`에서 에러를 던지며 서버가 시작되지 않습니다.
+
+Docker Compose로 로컬 PostgreSQL을 빠르게 시작할 수 있습니다:
 
 ```sh
+docker compose up -d
+cp .env.example .env
+pnpm db:migrate
 pnpm dev
 ```
 
-최초 시작 시 서버는 다음을 수행합니다:
+최초 시작 시 Drizzle이 스키마 마이그레이션을 자동 적용합니다.
 
-1. `~/.openmento/instances/default/db/` 디렉터리를 생성합니다.
-2. `openmento` 데이터베이스가 존재하는지 확인합니다.
-3. 빈 데이터베이스에 마이그레이션을 자동으로 적용합니다.
-4. 요청 수신을 시작합니다.
-
-데이터는 `~/.openmento/instances/default/db/` 에 재시작 후에도 유지됩니다.  
-로컬 개발 데이터를 초기화하려면 해당 디렉터리를 삭제합니다.
-
-보류 중인 마이그레이션을 수동으로 적용하려면:
+로컬 개발 데이터 초기화:
 
 ```sh
+docker compose down -v && docker compose up -d
 pnpm db:migrate
 ```
-
-이 모드는 로컬 개발과 원클릭 설치에 적합합니다.
 
 ## 2. 로컬 PostgreSQL (Docker)
 

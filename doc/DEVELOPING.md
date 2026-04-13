@@ -35,7 +35,17 @@ cp .env.example .env
 
 ## 데이터베이스
 
-`DATABASE_URL`을 설정하지 않으면 서버가 자동으로 임베디드 PostgreSQL 인스턴스를 시작합니다.
+`DATABASE_URL` 환경변수가 **필수**입니다. 설정되지 않으면 서버가 시작 시 에러를 던집니다.
+
+Docker Compose로 로컬 PostgreSQL을 시작하거나, Supabase/Neon 등 외부 URL을 `.env`에 지정하세요.
+
+```sh
+# Docker로 로컬 PostgreSQL 시작 (권장)
+docker compose up -d
+
+# 환경변수 파일 설정
+cp .env.example .env
+```
 
 ```sh
 # 마이그레이션 적용
@@ -48,7 +58,8 @@ pnpm db:generate
 로컬 개발 데이터 초기화:
 
 ```sh
-rm -rf data/pglite
+# docker-compose 사용 시
+docker compose down -v && docker compose up -d
 pnpm dev
 ```
 
