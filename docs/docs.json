@@ -1,0 +1,63 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "OpenMento",
+  "description": "AI 에이전트 팀으로 교육 기관을 자동화하는 제어 플랫폼",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/wogho/OpenMento"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "대시보드",
+    "url": "http://localhost:3100"
+  },
+  "navigation": [
+    {
+      "group": "시작하기",
+      "pages": [
+        "introduction",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "아키텍처",
+      "pages": [
+        "architecture/overview",
+        "architecture/multi-tenancy",
+        "architecture/agent-system",
+        "architecture/rag-pipeline"
+      ]
+    },
+    {
+      "group": "개발 가이드",
+      "pages": [
+        "development/setup",
+        "development/database",
+        "development/deployment"
+      ]
+    },
+    {
+      "group": "API 레퍼런스",
+      "pages": [
+        "api-reference/health",
+        "api-reference/institutions",
+        "api-reference/agents",
+        "api-reference/tasks"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/wogho/OpenMento"
+  }
+}

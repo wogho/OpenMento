@@ -1,0 +1,45 @@
+---
+title: 배포
+description: Docker를 활용한 프로덕션 배포 방법
+---
+
+## Docker Compose
+
+`docker/` 디렉터리에 프로덕션 및 개발용 Compose 파일이 있습니다.
+
+```bash
+# 프로덕션 배포
+docker compose -f docker/docker-compose.yml up -d
+
+# 개발 환경
+docker compose -f docker/docker-compose.dev.yml up
+```
+
+## 서비스 구성
+
+| 서비스 | 설명 |
+|--------|------|
+| `server` | Express API 서버 (`server/Dockerfile`) |
+| `ui` | React 대시보드 (`ui/Dockerfile`) |
+| `rag-worker` | BullMQ 임베딩 워커 (`packages/rag-worker/Dockerfile`) |
+| `nginx` | 리버스 프록시 (`docker/nginx.conf`) |
+| `postgres` | PostgreSQL DB |
+
+## 환경 변수 설정
+
+```bash
+# 필수 환경 변수
+DATABASE_URL=postgresql://user:password@postgres:5432/openmento
+OPENAI_API_KEY=sk-...
+REDIS_URL=redis://redis:6379
+```
+
+<Warning>
+프로덕션 환경에서는 반드시 강력한 DB 비밀번호와 시크릿을 사용하세요. `.env` 파일을 버전 관리에 포함하지 마세요.
+</Warning>
+
+## 헬스 체크
+
+```bash
+curl https://your-domain.com/api/health
+```

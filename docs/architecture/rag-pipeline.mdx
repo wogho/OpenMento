@@ -1,0 +1,42 @@
+---
+title: RAG 파이프라인
+description: 문서 임베딩 생성과 벡터 검색 흐름
+---
+
+## 개요
+
+RAG(Retrieval-Augmented Generation) 파이프라인은 에이전트가 기관의 교육 자료를 참조하여 답변을 생성할 수 있도록 합니다.
+
+## 비동기 임베딩 처리
+
+모든 임베딩 생성은 **BullMQ 큐를 통해 비동기로** 처리됩니다.
+
+```
+[문서 업로드 API] → [BullMQ 큐] → [rag-worker] → [임베딩 저장]
+```
+
+```typescript
+// API 핸들러에서 큐에만 추가
+await embeddingQueue.add('embed-document', {
+  documentId,
+  institutionId,
+});
+```
+
+<Note>
+`rag-worker` 패키지가 독립적인 프로세스로 큐를 소비합니다. API 서버와 워커는 분리되어 있습니다.
+</Note>
+
+## 패키지 구조
+
+| 패키지 | 역할 |
+|--------|------|
+| `packages/rag` | 임베딩 생성 및 벡터 검색 로직 |
+| `packages/rag-worker` | BullMQ 워커 (비동기 임베딩 처리) |
+
+## 검색 흐름
+
+1. 수강생/에이전트의 질의 입력
+2. 질의 텍스트를 임베딩 벡터로 변환
+3. `institution_id`로 스코프된 벡터 DB에서 유사 문서 검색
+4. 검색된 컨텍스트와 함께 LLM에 프롬프트 전달

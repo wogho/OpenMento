@@ -1,0 +1,50 @@
+---
+title: 개발 환경 설정
+description: OpenMento 로컬 개발 환경 구성 방법
+---
+
+## 요구사항
+
+- Node.js 20+
+- pnpm 8+
+- Git
+
+## 설치
+
+```bash
+git clone https://github.com/wogho/OpenMento.git
+cd OpenMento
+pnpm install
+pnpm dev
+```
+
+## 환경 변수
+
+| 변수 | 필수 | 설명 |
+|------|------|------|
+| `DATABASE_URL` | 선택 | PostgreSQL 연결 문자열. 미설정 시 PGlite 임베디드 DB 사용 |
+| `OPENAI_API_KEY` | 필수 | OpenAI API 키 (에이전트·RAG 기능) |
+| `REDIS_URL` | 선택 | BullMQ 큐용 Redis. 미설정 시 메모리 큐 |
+
+<Warning>
+환경 변수를 코드에 하드코딩하지 마세요. 반드시 `.env` 파일 또는 시크릿 관리 서비스를 사용하세요.
+</Warning>
+
+## 커밋 컨벤션
+
+[Conventional Commits](https://www.conventionalcommits.org/) 형식을 따릅니다:
+
+```
+feat(rag): 유사도 임계값 기관별 설정 기능 추가
+fix(heartbeat): 에이전트 재시작 시 컨텍스트 누락 문제 수정
+docs(spec): RAG 파이프라인 아키텍처 명세 업데이트
+```
+
+## 자주 발생하는 실수
+
+| 실수 | 올바른 방법 |
+|------|-------------|
+| `institution_id` 없는 쿼리 | 모든 쿼리에 `institution_id` 스코프 지정 |
+| API 핸들러에서 직접 임베딩 생성 | BullMQ 큐에 작업 추가 |
+| 에이전트 감사 로그 수정 | 로그는 추가 전용(append-only) |
+| 환경변수 코드 하드코딩 | `.env` 또는 시크릿 관리 서비스 사용 |

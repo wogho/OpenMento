@@ -1,0 +1,63 @@
+---
+title: OpenMento 소개
+description: AI 에이전트 팀으로 교육 기관을 자동화하는 제어 플랫폼
+---
+
+## 개요
+
+**OpenMento**는 AI 에이전트들로 구성된 교육 팀의 지휘·통신·제어 플랫폼입니다.
+
+커리큘럼 설계자, 튜터, 평가자, 운영 담당자 역할을 하는 AI 에이전트들이 실제 조직처럼 협업하며 교육 기관을 운영합니다.
+
+<CardGroup cols={2}>
+  <Card title="빠른 시작" icon="rocket" href="/quickstart">
+    5분 안에 로컬 환경을 구동해보세요
+  </Card>
+  <Card title="아키텍처 개요" icon="diagram-project" href="/architecture/overview">
+    시스템 구조와 핵심 원칙을 이해하세요
+  </Card>
+  <Card title="개발 가이드" icon="code" href="/development/setup">
+    개발 환경 설정과 기여 방법을 확인하세요
+  </Card>
+  <Card title="API 레퍼런스" icon="plug" href="/api-reference/health">
+    REST API 엔드포인트 명세를 확인하세요
+  </Card>
+</CardGroup>
+
+## 핵심 문제
+
+기존 LMS(학습 관리 시스템)는 충분하지 않습니다. AI 에이전트로 교육 현장 구성원 모두를 보조할 때, 단순한 강의 수강 시스템 이상의 **제어 플랫폼(Control Plane)**이 필요합니다.
+
+<AccordionGroup>
+  <Accordion title="수강생의 문제">
+    - 모든 학생에게 동일한 커리큘럼과 진도가 적용됩니다
+    - 개별 이해도를 반영한 즉각적인 피드백을 받기 어렵습니다
+    - AI 도구를 이용한 양산형 결과물 제출이 만연합니다
+  </Accordion>
+  <Accordion title="교강사의 문제">
+    - 수십~수백 명의 수강생에게 개별 피드백 제공에 과도한 시간이 소요됩니다
+    - 학습 이탈 징후를 실시간으로 파악하지 못합니다
+    - 평가의 일관성 유지와 과제 진정성 검증에 한계가 있습니다
+  </Accordion>
+  <Accordion title="교육 운영자의 문제">
+    - 수강생 관리, 일정 조율, 리포트 생성 등 반복 운영 업무에 리소스가 낭비됩니다
+    - 에이전트 운영 비용을 통제하는 체계가 없습니다
+  </Accordion>
+</AccordionGroup>
+
+## OpenMento이 하는 일
+
+<Steps>
+  <Step title="에이전트를 교육 직원으로 관리">
+    배치, 조직, 업무 추적을 단일 플랫폼에서 수행합니다
+  </Step>
+  <Step title="조직 구조 정의">
+    에이전트들이 실제 운영하는 조직도를 구성합니다
+  </Step>
+  <Step title="예산 및 비용 통제">
+    기관별 에이전트 호출 예산을 원자적으로 관리합니다
+  </Step>
+  <Step title="멀티 테넌시 격리">
+    여러 교육 기관을 완전히 격리된 환경에서 동시에 운영합니다
+  </Step>
+</Steps>

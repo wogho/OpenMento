@@ -1,0 +1,56 @@
+---
+title: 데이터베이스
+description: Drizzle ORM 스키마, 마이그레이션, 멀티 테넌시 쿼리
+---
+
+## 스택
+
+- **ORM**: Drizzle ORM
+- **DB**: PostgreSQL (프로덕션) / PGlite (로컬 개발)
+- **패키지**: `packages/db`
+
+## 마이그레이션
+
+```bash
+# 마이그레이션 생성
+cd packages/db
+pnpm drizzle-kit generate
+
+# 마이그레이션 적용
+pnpm drizzle-kit migrate
+```
+
+마이그레이션 파일은 `packages/db/drizzle/` 디렉터리에 저장됩니다.
+
+## 쿼리 작성 규칙
+
+모든 쿼리는 반드시 `institution_id`로 스코프를 지정해야 합니다.
+
+```typescript
+import { db } from '@openmento/db';
+import { eq } from 'drizzle-orm';
+import { tasks } from '@openmento/db/schema';
+
+// ✅ 올바른 예
+const result = await db.query.tasks.findMany({
+  where: eq(tasks.institutionId, institutionId),
+});
+
+// ❌ 잘못된 예
+const result = await db.query.tasks.findMany();
+```
+
+## Row Level Security
+
+데이터베이스 레벨에서 RLS 정책이 적용되어 테넌트 간 데이터 접근을 차단합니다.
+
+<Info>
+`packages/db/drizzle/0009_rls_tenant_isolation.sql`에서 RLS 정책 상세를 확인할 수 있습니다.
+</Info>
+
+## 로컬 DB 초기화
+
+```bash
+rm -rf data/pglite
+pnpm dev
+```

@@ -1,0 +1,68 @@
+---
+title: 아키텍처 개요
+description: OpenMento 시스템 구조와 핵심 설계 원칙
+---
+
+## 서비스 구조
+
+```
+server/          — Express REST API 및 에이전트 오케스트레이션
+ui/              — React + Vite 대시보드
+packages/
+  db/            — Drizzle 스키마, 마이그레이션, DB 클라이언트
+  shared/        — 공유 타입, 상수, 검증기, API 경로 상수
+  rag/           — RAG 파이프라인 (임베딩 생성 및 검색)
+  rag-worker/    — BullMQ 기반 비동기 임베딩 워커
+skills/          — 에이전트 스킬 파일 (.md)
+tests/e2e/       — Playwright E2E 테스트
+```
+
+## 핵심 설계 원칙
+
+### 원자적 작업 체크아웃
+
+에이전트가 작업을 체크아웃할 때 **예산 적용이 원자적으로 처리**됩니다. 중복 작업 실행과 예산 초과를 방지합니다.
+
+### 멀티 테넌시 격리
+
+모든 DB 쿼리는 반드시 `institution_id`로 범위를 지정해야 합니다.
+
+```typescript
+// ✅ 올바른 예
+const tasks = await db.query.tasks.findMany({
+  where: eq(tasks.institutionId, institutionId),
+});
+
+// ❌ 잘못된 예 — 절대 하지 말 것
+const tasks = await db.query.tasks.findMany();
+```
+
+### 감사 로그 불변성
+
+에이전트 도구 호출 로그와 티켓 기록은 **불변(append-only)**입니다. 생성 후에는 수정하거나 삭제하지 않습니다.
+
+### RAG 파이프라인 비동기 처리
+
+임베딩 생성은 BullMQ 큐를 통해 **비동기로 처리**됩니다. API 핸들러에서 직접 임베딩을 생성하지 않습니다.
+
+```typescript
+// ✅ 올바른 예 — 큐에 추가
+await embeddingQueue.add('embed-document', { documentId, institutionId });
+
+// ❌ 잘못된 예 — 핸들러에서 직접 임베딩 생성 금지
+const embedding = await openai.embeddings.create({ ... });
+```
+
+## 다음
+
+<CardGroup cols={3}>
+  <Card title="멀티 테넌시" href="/architecture/multi-tenancy" icon="building">
+    기관 격리 모델 상세
+  </Card>
+  <Card title="에이전트 시스템" href="/architecture/agent-system" icon="robot">
+    에이전트 배치 및 오케스트레이션
+  </Card>
+  <Card title="RAG 파이프라인" href="/architecture/rag-pipeline" icon="magnifying-glass">
+    임베딩 및 검색 흐름
+  </Card>
+</CardGroup>

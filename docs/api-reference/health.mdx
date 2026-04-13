@@ -1,0 +1,30 @@
+---
+title: Health Check
+description: 서버 상태 확인 엔드포인트
+api: "GET /api/health"
+---
+
+## 요청
+
+```bash
+curl http://localhost:3100/api/health
+```
+
+## 응답
+
+<ResponseField name="status" type="string" required>
+  서버 상태. 정상 시 `"ok"`
+</ResponseField>
+
+```json
+{
+  "status": "ok"
+}
+```
+
+## 응답 코드
+
+| 코드 | 설명 |
+|------|------|
+| `200` | 서버 정상 |
+| `503` | 서버 불가용 |

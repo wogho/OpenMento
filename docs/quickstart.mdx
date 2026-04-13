@@ -1,0 +1,99 @@
+---
+title: 빠른 시작
+description: 로컬에서 OpenMento를 5분 안에 실행하는 방법
+---
+
+## 사전 요구사항
+
+- Node.js 20+
+- pnpm 8+
+- Git
+
+## 1. 저장소 클론
+
+```bash
+git clone https://github.com/wogho/OpenMento.git
+cd OpenMento
+```
+
+## 2. 의존성 설치
+
+```bash
+pnpm install
+```
+
+## 3. 환경 변수 설정 (선택)
+
+`DATABASE_URL`을 설정하지 않으면 **임베디드 PostgreSQL(PGlite)**을 자동으로 사용합니다.
+
+```bash
+# .env 파일 생성 (외부 DB 사용 시)
+DATABASE_URL=postgresql://user:password@localhost:5432/openmento
+```
+
+<Info>
+로컬 개발 시에는 환경 변수 없이 바로 시작할 수 있습니다.
+</Info>
+
+## 4. 개발 서버 시작
+
+```bash
+pnpm dev
+```
+
+다음 서비스가 시작됩니다:
+
+| 서비스 | 주소 |
+|--------|------|
+| API 서버 | `http://localhost:3100` |
+| UI 대시보드 | `http://localhost:3100` |
+
+## 5. 헬스 체크
+
+```bash
+curl http://localhost:3100/api/health
+```
+
+```json
+{ "status": "ok" }
+```
+
+## 로컬 DB 초기화
+
+기존 데이터를 모두 삭제하고 새로 시작하려면:
+
+```bash
+rm -rf data/pglite
+pnpm dev
+```
+
+<Warning>
+`data/pglite`를 삭제하면 로컬 데이터가 모두 사라집니다.
+</Warning>
+
+## 테스트 실행
+
+```bash
+# 전체 테스트
+pnpm test:run
+
+# 타입 검사
+pnpm typecheck
+
+# 린트
+pnpm lint
+
+# E2E 테스트
+pnpm exec playwright test
+```
+
+## 다음 단계
+
+<CardGroup cols={2}>
+  <Card title="아키텍처 이해하기" icon="diagram-project" href="/architecture/overview">
+    멀티 테넌시, 에이전트 시스템, RAG 파이프라인 구조를 파악하세요
+  </Card>
+  <Card title="데이터베이스 설정" icon="database" href="/development/database">
+    Drizzle ORM 스키마와 마이그레이션 방법을 확인하세요
+  </Card>
+</CardGroup>
