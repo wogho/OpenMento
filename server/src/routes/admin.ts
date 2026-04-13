@@ -515,12 +515,35 @@ router.post('/courses/:courseId/assignments', async (req, res) => {
 });
 
 // POST /admin/courses/:courseId/skills/link — 기존 스킬을 과목에 연결
+// builtin: 접두사인 경우 레지스트리에서 복사본을 생성 후 연결합니다.
 router.post('/courses/:courseId/skills/link', async (req, res) => {
   const { institutionId } = req.user!;
   const { courseId } = req.params;
   const { skillId } = req.body as { skillId?: string };
   if (!skillId) { res.status(400).json({ error: 'skillId 필수' }); return; }
 
+  // ── builtin 스킬 처리 ─────────────────────────────────────────────────────
+  if (skillId.startsWith('builtin:')) {
+    const builtins = listBuiltinSkills();
+    const builtin = builtins.find((s) => s.id === skillId);
+    if (!builtin) { res.status(404).json({ error: '빌트인 스킬을 찾을 수 없습니다.' }); return; }
+
+    // DB에 복사본 생성 후 과목에 연결
+    const [created] = await db.insert(instructorSkills).values({
+      institutionId,
+      courseId,
+      title: builtin.title,
+      markdown: builtin.markdown,
+      tags: builtin.tags,
+      isActive: true,
+      sourceRef: builtin.sourceRef,
+    }).returning({ id: instructorSkills.id });
+
+    res.json({ success: true, skillId: created.id });
+    return;
+  }
+
+  // ── 일반 DB 스킬 처리 ────────────────────────────────────────────────────
   const [skill] = await db.select({ id: instructorSkills.id })
     .from(instructorSkills)
     .where(and(eq(instructorSkills.id, skillId), eq(instructorSkills.institutionId, institutionId), isNull(instructorSkills.deletedAt)))
