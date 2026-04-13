@@ -5,6 +5,7 @@ import {
   ToggleLeft, ToggleRight, Trash2, FileEdit, X, ShieldCheck, BookOpen,
 } from 'lucide-react';
 import { apiFetch } from '../../lib/apiFetch';
+import { useAuth } from '../../hooks/useAuth';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
@@ -59,6 +60,9 @@ interface NewInstructorForm {
 const emptyForm: NewInstructorForm = { name: '', email: '', password: '', tags: '' };
 
 export default function InstructorManagement() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<NewInstructorForm>(emptyForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -206,12 +210,14 @@ export default function InstructorManagement() {
             강사를 등록하고 AI 멘토링 시스템 접근 권한을 부여합니다.
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-md"
-        >
-          <UserPlus size={18} /> 강사 추가
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-md"
+          >
+            <UserPlus size={18} /> 강사 추가
+          </button>
+        )}
       </div>
 
       {/* 테이블 */}
@@ -228,9 +234,11 @@ export default function InstructorManagement() {
           <div className="flex flex-col items-center justify-center p-20 text-gray-400">
             <GraduationCap size={48} className="mb-4 opacity-30" />
             <p>등록된 강사가 없습니다.</p>
-            <button onClick={() => setIsModalOpen(true)} className="mt-4 text-indigo-600 hover:underline text-sm">
-              첫 강사 등록하기
-            </button>
+            {isAdmin && (
+              <button onClick={() => setIsModalOpen(true)} className="mt-4 text-indigo-600 hover:underline text-sm">
+                첫 강사 등록하기
+              </button>
+            )}
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
@@ -295,27 +303,31 @@ export default function InstructorManagement() {
                     >
                       <BookOpen size={16} />
                     </button>
-                    <button
-                      onClick={() => openEdit(inst)}
-                      className="text-gray-400 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"
-                      title="정보 수정 / 권한 설정"
-                    >
-                      <FileEdit size={16} />
-                    </button>
-                    <button
-                      onClick={() => toggleMutation.mutate({ id: inst.id, isActive: !inst.isActive })}
-                      className="text-gray-400 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"
-                      title={inst.isActive ? '비활성화' : '활성화'}
-                    >
-                      {inst.isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(inst.id)}
-                      className="text-gray-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition ml-1"
-                      title="계정 비활성화"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => openEdit(inst)}
+                          className="text-gray-400 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"
+                          title="정보 수정 / 권한 설정"
+                        >
+                          <FileEdit size={16} />
+                        </button>
+                        <button
+                          onClick={() => toggleMutation.mutate({ id: inst.id, isActive: !inst.isActive })}
+                          className="text-gray-400 hover:text-indigo-600 p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition"
+                          title={inst.isActive ? '비활성화' : '활성화'}
+                        >
+                          {inst.isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(inst.id)}
+                          className="text-gray-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition ml-1"
+                          title="계정 비활성화"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

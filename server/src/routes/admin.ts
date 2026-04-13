@@ -1301,14 +1301,14 @@ router.get('/org/full', async (req, res) => {
 
   const filterInstructorId = req.query.instructorId as string | undefined;
 
-  // 1) 강사 목록 (role: instructor | teacher)
+  // 1) 강사 목록 (role: instructor | teacher | admin)
   const instructorRows = await db
     .select({ id: adminUsers.id, name: adminUsers.name, role: adminUsers.role })
     .from(adminUsers)
     .where(and(
       eq(adminUsers.institutionId, institutionId),
       eq(adminUsers.isActive, true),
-      inArray(adminUsers.role, ['instructor', 'teacher']),
+      inArray(adminUsers.role, ['instructor', 'teacher', 'admin']),
       ...(filterInstructorId ? [eq(adminUsers.id, filterInstructorId)] : []),
     ));
 
@@ -1318,21 +1318,19 @@ router.get('/org/full', async (req, res) => {
     .from(courses)
     .where(and(eq(courses.institutionId, institutionId), isNull(courses.deletedAt)));
 
-  // 3) 스킬 목록
+  // 3) 스킬 목록 (is_private/scope 컬럼 미존재 — 기본값으로 대체)
   const skillRows = await db
     .select({
       id: instructorSkills.id,
       title: instructorSkills.title,
       courseId: instructorSkills.courseId,
       agentId: instructorSkills.agentId,
-      isPrivate: sql<boolean>`"instructor_skills"."is_private"`,
-      scope: sql<string>`"instructor_skills"."scope"`,
       tags: instructorSkills.tags,
     })
     .from(instructorSkills)
     .where(and(eq(instructorSkills.institutionId, institutionId), isNull(instructorSkills.deletedAt)));
 
-  // 4) 에이전트 목록
+  // 4) 에이전트 목록 (is_private/scope 컬럼 미존재 — 기본값으로 대체)
   const agentRows = await db
     .select({
       id: agents.id,
@@ -1340,15 +1338,13 @@ router.get('/org/full', async (req, res) => {
       role: agents.role,
       status: agents.status,
       title: agents.title,
-      isPrivate: sql<boolean>`"agents"."is_private"`,
-      scope: sql<string>`"agents"."scope"`,
       model: sql<string | null>`"agents"."adapter_config"->>'model'`,
     })
     .from(agents)
     .where(and(eq(agents.institutionId, institutionId), isNull(agents.deletedAt)));
 
-  // 5) 과목별 수강생 목록 (5계층)
-  const studentCourseRows = await db
+  // 5) 과목별 수강생 목록 — student_courses 우선, 비어있으면 students.course_id FK 폴백
+  let studentCourseRows: { courseId: string | null; studentId: string; displayName: string | null; email: string | null }[] = await db
     .select({
       courseId: studentCourses.courseId,
       studentId: students.id,
@@ -1362,6 +1358,20 @@ router.get('/org/full', async (req, res) => {
       isNull(studentCourses.deletedAt),
       isNull(students.deletedAt),
     ));
+
+  // student_courses가 비어있으면 students 테이블의 직접 FK로 폴백
+  if (studentCourseRows.length === 0) {
+    const fallbackRows = await db
+      .select({
+        courseId: students.courseId,
+        studentId: students.id,
+        displayName: students.displayName,
+        email: students.email,
+      })
+      .from(students)
+      .where(and(eq(students.institutionId, institutionId), isNull(students.deletedAt)));
+    studentCourseRows = fallbackRows;
+  }
 
   // courseId → students[] 맵
   const courseStudentsMap = new Map<string, { id: string; displayName: string | null; email: string | null }[]>();
@@ -1384,6 +1394,12 @@ router.get('/org/full', async (req, res) => {
   type OrgCourse = { id: string; name: string; subject: string; skills: OrgSkill[]; students: OrgStudent[] };
   type OrgInstructor = { id: string; name: string; role: string; courses: OrgCourse[] };
 
+  const buildAgent = (agentId: string): OrgAgent | null => {
+    const a = agentMap.get(agentId);
+    if (!a) return null;
+    return { id: a.id, name: a.name, role: a.role, status: a.status, title: a.title ?? null, isPrivate: false, scope: 'global', model: a.model ?? null };
+  };
+
   const tree: OrgInstructor[] = instructorRows.map(ins => {
     const insCourses = courseRows.filter(c => c.instructorId === ins.id);
     return {
@@ -1400,24 +1416,42 @@ router.get('/org/full', async (req, res) => {
           skills: cSkills.map(s => ({
             id: s.id,
             title: s.title,
-            isPrivate: s.isPrivate ?? false,
-            scope: s.scope ?? 'global',
+            isPrivate: false,
+            scope: 'global',
             tags: s.tags ?? null,
-            agent: s.agentId ? (agentMap.get(s.agentId) ? {
-              id: agentMap.get(s.agentId)!.id,
-              name: agentMap.get(s.agentId)!.name,
-              role: agentMap.get(s.agentId)!.role,
-              status: agentMap.get(s.agentId)!.status,
-              title: agentMap.get(s.agentId)!.title ?? null,
-              isPrivate: agentMap.get(s.agentId)!.isPrivate ?? false,
-              scope: agentMap.get(s.agentId)!.scope ?? 'global',
-              model: agentMap.get(s.agentId)!.model ?? null,
-            } : null) : null,
+            agent: s.agentId ? buildAgent(s.agentId) : null,
           })),
         };
       }),
     };
   });
+
+  // instructorId = NULL 인 과목들 — "(강사 미배정)" 가상 노드로 묶기
+  const unassignedCourses = courseRows.filter(c => !c.instructorId);
+  if (unassignedCourses.length > 0) {
+    tree.push({
+      id: '__unassigned__',
+      name: '(강사 미배정)',
+      role: 'unassigned',
+      courses: unassignedCourses.map(c => {
+        const cSkills = skillRows.filter(s => s.courseId === c.id);
+        return {
+          id: c.id,
+          name: c.name,
+          subject: c.subject,
+          students: courseStudentsMap.get(c.id) ?? [],
+          skills: cSkills.map(s => ({
+            id: s.id,
+            title: s.title,
+            isPrivate: false,
+            scope: 'global',
+            tags: s.tags ?? null,
+            agent: s.agentId ? buildAgent(s.agentId) : null,
+          })),
+        };
+      }),
+    });
+  }
 
   // 미연결 자산 (과목에 연결되지 않은 스킬, 스킬에 연결되지 않은 에이전트)
   const unassignedSkills = skillRows
@@ -1425,19 +1459,10 @@ router.get('/org/full', async (req, res) => {
     .map(s => ({
       id: s.id,
       title: s.title,
-      isPrivate: s.isPrivate ?? false,
-      scope: s.scope ?? 'global',
+      isPrivate: false,
+      scope: 'global',
       tags: s.tags ?? null,
-      agent: s.agentId ? (agentMap.get(s.agentId) ? {
-        id: agentMap.get(s.agentId)!.id,
-        name: agentMap.get(s.agentId)!.name,
-        role: agentMap.get(s.agentId)!.role,
-        status: agentMap.get(s.agentId)!.status,
-        title: agentMap.get(s.agentId)!.title ?? null,
-        isPrivate: agentMap.get(s.agentId)!.isPrivate ?? false,
-        scope: agentMap.get(s.agentId)!.scope ?? 'global',
-        model: agentMap.get(s.agentId)!.model ?? null,
-      } : null) : null,
+      agent: s.agentId ? buildAgent(s.agentId) : null,
     }));
 
   const unassignedAgents = agentRows
@@ -1448,8 +1473,8 @@ router.get('/org/full', async (req, res) => {
       role: a.role,
       status: a.status,
       title: a.title ?? null,
-      isPrivate: a.isPrivate ?? false,
-      scope: a.scope ?? 'global',
+      isPrivate: false,
+      scope: 'global',
       model: a.model ?? null,
     }));
 
