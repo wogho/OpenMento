@@ -499,21 +499,6 @@ export default function AdminPage() {
             </label>
           </div>
 
-          {/* 채팅 미리보기 (온보딩 투어 타깃: admin-chat-preview-btn) */}
-          <div className="px-3 pt-2 pb-1 shrink-0">
-            <button
-              id="admin-chat-preview-btn"
-              onClick={() => navigate('/chat')}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400
-                bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30
-                border border-indigo-100 dark:border-indigo-800 rounded-xl transition-colors"
-              title="수강생 AI 튜터 채팅 화면 미리보기"
-            >
-              <span className="text-xs">💬</span>
-              수강생 화면으로
-            </button>
-          </div>
-
           {/* 그룹별 네비게이션 */}
           <nav className="flex-1 px-3 pb-4 space-y-4">
             {filteredGroups.map(group => (

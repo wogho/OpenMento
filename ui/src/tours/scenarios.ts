@@ -59,17 +59,6 @@ export const adminTour: TourScenario = {
         align: 'start',
       },
     },
-    {
-      element: '#admin-chat-preview-btn',
-      popover: {
-        title: ' 수강생 뷰 미리보기',
-        description:
-          '이 버튼을 클릭하면 수강생이 보는 AI 튜터 채팅 화면으로 이동합니다. ' +
-          '직접 질문을 입력해 대화 흐름을 확인해보세요.',
-        side: 'top',
-        align: 'center',
-      },
-    },
   ],
 };
 
