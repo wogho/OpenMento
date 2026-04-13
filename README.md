@@ -196,25 +196,72 @@ OpenMento는 까다로운 오케스트레이션 세부 사항을 올바르게 �
 
 오픈소스. 자체 호스팅. 별도 계정 불필요.
 
+> **요구 사항:** Node.js 20+, pnpm 9.15+, Docker
+
+### 1. 저장소 클론 및 의존성 설치
+
 ```bash
-git clone https://github.com/wogho/OpenMento.git
-cd OpenMento/openmento
+git clone https://github.com/wogho/OpenMento_Stage.git
+cd OpenMento_Stage
 pnpm install
-pnpm dev
 ```
 
-API 서버는 `http://localhost:3100`에서 시작됩니다. 임베디드 PostgreSQL 데이터베이스가 자동으로 생성됩니다.
-
-> **요구 사항:** Node.js 20+, pnpm 9.15+
-
-또는 Docker를 사용하는 경우:
+### 2. 내부 패키지 빌드
 
 ```bash
-cp .env.example .env
-pnpm docker:up
-pnpm db:migrate
+pnpm --filter '!ui' --filter '!server' build
+```
+
+### 3. DB & Redis 컨테이너 시작
+
+```bash
+docker compose -f docker/docker-compose.yml up -d db redis
+```
+
+### 4. 환경변수 설정
+
+```bash
+cat > server/.env << 'EOF'
+DATABASE_URL=postgresql://openmento_user:openmento_pass@localhost:5432/openmento_db
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=dev-secret-min-32-chars-for-local-only
+REDIS_URL=redis://localhost:6379
+TZ=Asia/Seoul
+EOF
+```
+
+### 5. DB 마이그레이션 적용
+
+```bash
+cd packages/db
+for f in $(cat drizzle/meta/_journal.json | python3 -c "
+import json,sys
+j=json.load(sys.stdin)
+for e in j['entries']:
+    print(e['tag'])
+"); do
+  sed 's/--> statement-breakpoint/;/g' drizzle/${f}.sql | \
+    docker exec -i docker-db-1 psql -U openmento_user -d openmento_db
+done
+cd ../..
+```
+
+### 6. 개발 서버 시작
+
+```bash
 pnpm dev
 ```
+
+- API: `http://localhost:3000`
+- UI: `http://localhost:5173` (Vite dev server, `/api/*` → `localhost:3000` 프록시)
+
+헬스 체크:
+```bash
+curl http://localhost:3000/health
+```
+
+> 이후 재실행 시에는 DB 컨테이너가 꺼져 있을 경우 `docker compose -f docker/docker-compose.yml up -d db redis` 후 `pnpm dev`만 실행하면 됩니다.
 
 <br/>
 
@@ -237,12 +284,18 @@ pgvector 확장을 사용하여 교육 문서를 벡터로 변환하고 저장�
 ## 개발
 
 ```bash
-pnpm dev              # 전체 개발 서버 구동 (API + UI, Watch 모드)
+# 전체 개발 서버 구동 (API :3000 + UI :5173, Watch 모드)
+pnpm dev
+
 pnpm build            # 전체 빌드
 pnpm typecheck        # 타입 검사
 pnpm test:run         # 테스트 실행
 pnpm db:generate      # DB 마이그레이션 파일 생성
-pnpm db:migrate       # 마이그레이션 적용
+```
+
+내부 패키지(db, shared, rag 등) 스키마 변경 후에는 반드시 재빌드가 필요합니다:
+```bash
+pnpm --filter '!ui' --filter '!server' build
 ```
 
 전체 개발 가이드는 [doc/DEVELOPING.md](doc/DEVELOPING.md)를 참조하세요.

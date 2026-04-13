@@ -66,7 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       // exp 클레임이 존재하면 만료 여부 확인
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // base64url → base64 → UTF-8 바이트 → TextDecoder (한글 등 멀티바이트 안전 처리)
+      let payload: { exp?: number } = {};
+      try {
+        const rawPayload = token.split('.')[1];
+        const base64 = rawPayload.replace(/-/g, '+').replace(/_/g, '/');
+        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        payload = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+      } catch {
+        logout();
+        return;
+      }
       if (payload.exp && payload.exp * 1000 < Date.now()) {
         logout();
       }

@@ -47,3 +47,4 @@ plan.md
 all.md
 temp.txt
 test_output.txt
+*.tsbuildinfo
