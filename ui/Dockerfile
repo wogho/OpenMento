@@ -9,10 +9,10 @@ WORKDIR /app
 
 # ── 의존성 설치 ──────────────────────────────────────────────
 FROM base AS deps
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY ui/package.json ./ui/
-RUN pnpm install --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ── 개발 (Vite dev server) ───────────────────────────────────
 FROM deps AS dev
