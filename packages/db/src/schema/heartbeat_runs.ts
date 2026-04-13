@@ -18,6 +18,8 @@ export const heartbeatStatusEnum = pgEnum('heartbeat_status', [
   'running',
   'completed',
   'failed',
+  'cancelled',
+  'timed_out',
 ]);
 
 export const heartbeatRuns = pgTable('heartbeat_runs', {
@@ -29,6 +31,9 @@ export const heartbeatRuns = pgTable('heartbeat_runs', {
   agentId: uuid('agent_id')
     .notNull()
     .references(() => agents.id, { onDelete: 'cascade' }),
+  // paperclip: timer | on_demand | wakeup | automation
+  invocationSource: text('invocation_source').notNull().default('timer'),
+  triggerDetail: text('trigger_detail'),
   status: heartbeatStatusEnum('status').notNull().default('queued'),
   // 실행 잠금 (중복 실행 방지)
   executionLockedAt: timestamp('execution_locked_at', { withTimezone: true }),
@@ -42,6 +47,13 @@ export const heartbeatRuns = pgTable('heartbeat_runs', {
   errorMessage: text('error_message'),
   startedAt: timestamp('started_at', { withTimezone: true }),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
+  // paperclip: 실행 시점 에이전트/예산/태스크 스냅샷
+  contextSnapshot: jsonb('context_snapshot'),
+  // paperclip: Session Codec — 실행 전/후 세션 식별자 감사 추적
+  sessionIdBefore: text('session_id_before'),
+  sessionIdAfter: text('session_id_after'),
+  // paperclip: 어댑터가 반환한 오류 코드 (예: 'rate_limited', 'context_too_long')
+  errorCode: text('error_code'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   // FK 인덱스 — 기관별·에이전트별 실행 이력 조회 최적화

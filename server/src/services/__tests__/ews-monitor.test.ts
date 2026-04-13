@@ -21,22 +21,23 @@ import {
 // ── scoreAttendance ────────────────────────────────────────────────────────────
 
 describe('scoreAttendance', () => {
-  it('데이터 없음 → 최악 가정 40점', () => {
-    expect(scoreAttendance(0, false)).toBe(40);
-    expect(scoreAttendance(5, false)).toBe(40);
+  it('LMS 미연동 (hasData=false) → 0점 (가중치 AI 상호작용으로 재배분)', () => {
+    // 신규 설계: LMS 미연동 시 출석 점수 0; AI 상호작용 가중치가 60점으로 증가
+    expect(scoreAttendance(0, false)).toBe(0);
+    expect(scoreAttendance(5, false)).toBe(0);
   });
 
   it('데이터 있고 결석 0일 → 0점', () => {
     expect(scoreAttendance(0, true)).toBe(0);
   });
 
-  it('결석 1일 → 20점 (50%)', () => {
-    expect(scoreAttendance(1, true)).toBe(20);
+  it('결석 1일 → 10점 (WEIGHT_ATTENDANCE*0.5 = 20*0.5)', () => {
+    expect(scoreAttendance(1, true)).toBe(10);
   });
 
-  it('결석 2일 이상 → 40점 (만점)', () => {
-    expect(scoreAttendance(2, true)).toBe(40);
-    expect(scoreAttendance(10, true)).toBe(40);
+  it('결석 2일 이상 → 20점 (WEIGHT_ATTENDANCE 만점)', () => {
+    expect(scoreAttendance(2, true)).toBe(20);
+    expect(scoreAttendance(10, true)).toBe(20);
   });
 });
 
@@ -47,13 +48,13 @@ describe('scoreAssignment', () => {
     expect(scoreAssignment(0)).toBe(0);
   });
 
-  it('미제출 1개 → 18점 (Math.round(35*0.5))', () => {
-    expect(scoreAssignment(1)).toBe(18);
+  it('미제출 1개 → 13점 (Math.round(25*0.5))', () => {
+    expect(scoreAssignment(1)).toBe(13);
   });
 
-  it('미제출 2개 이상 → 35점 (만점)', () => {
-    expect(scoreAssignment(2)).toBe(35);
-    expect(scoreAssignment(99)).toBe(35);
+  it('미제출 2개 이상 → 25점 (WEIGHT_ASSIGNMENT 만점)', () => {
+    expect(scoreAssignment(2)).toBe(25);
+    expect(scoreAssignment(99)).toBe(25);
   });
 });
 

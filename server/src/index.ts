@@ -1,22 +1,30 @@
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
+import path from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import authRouter from './routes/auth.js';
 import studentRouter from './routes/student.js';
 import instructorRouter from './routes/instructor.js';
 import adminRouter from './routes/admin.js';
 import webhookRouter from './routes/webhook.js';
+import lmsWebhookRouter from './routes/lms-webhook.js';
 import portfolioRouter from './routes/portfolio.js';
 import superAdminRouter from './routes/super-admin.js';
 import onboardingRouter from './routes/onboarding.js';
 import setupRouter from './routes/setup.js';
+import assignmentsRouter from './routes/assignments.js';
+import portfolioPostsRouter from './routes/portfolio-posts.js';
+import attendanceRouter from './routes/attendance.js';
 import { createBullBoardRouter, BULL_BOARD_BASE_PATH } from './routes/bull-board.js';
 import { createSocketServer } from './socket/chat.handler.js';
 import { startHeartbeatScheduler, stopHeartbeatScheduler } from './services/heartbeat.js';
+import { startHeartbeatProactiveScheduler } from './services/heartbeat-proactive.js';
 import { startWebhookWorker, closeWebhookWorker } from './queues/webhook.worker.js';
 import { initEwsThresholdsDb, loadEwsThresholdsFromDb } from './services/ews-thresholds.js';
-import { initInstitutionSettingsDb, loadAllInstitutionSettings, getInstitutionSetting } from './services/institution-settings-service.js';
+import { initInstitutionSettingsDb, loadAllInstitutionSettings } from './services/institution-settings-service.js';
+import { loadDefaultSkills, watchSkillFiles } from './services/skill-registry.js';
 import { closeWebhookQueue } from './queues/webhook.queue.js';
 import { closeRagIngestQueue } from './queues/rag-ingest.queue.js';
 import { startRagQueueEvents, closeRagQueueEvents } from './queues/rag-queue-events.js';
@@ -29,6 +37,10 @@ import { getMetrics, requestCounter, apiResponseTimeHistogram } from './utils/me
 import { sendSystemErrorToSlack } from './services/slack-notifier.js';
 
 const app = express();
+
+// Codespaces/Ingress 환경에서는 X-Forwarded-* 헤더가 기본 포함됩니다.
+// 첫 번째 프록시 홉만 신뢰해 rate-limit 우회 위험을 낮춥니다.
+app.set('trust proxy', 1);
 
 const httpServer = createServer(app);
 
@@ -60,6 +72,16 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
+// ── 정적 파일 서빙: 과제 첨부파일 ────────────────────────────────────────────
+const ASSIGN_UPLOAD_DIR = process.env.ASSIGN_UPLOAD_DIR ?? path.join(process.cwd(), 'uploads', 'assignments');
+mkdirSync(ASSIGN_UPLOAD_DIR, { recursive: true });
+app.use('/uploads/assignments', express.static(ASSIGN_UPLOAD_DIR));
+
+// ── 정적 파일 서빙: 포트폴리오 첨부파일 ──────────────────────────────────────────
+const PORTFOLIO_UPLOAD_DIR = process.env.PORTFOLIO_UPLOAD_DIR ?? path.join(process.cwd(), 'uploads', 'portfolios');
+mkdirSync(PORTFOLIO_UPLOAD_DIR, { recursive: true });
+app.use('/uploads/portfolios', express.static(PORTFOLIO_UPLOAD_DIR));
+
 // ── GitHub Webhook: raw Buffer 파싱 (HMAC 서명 검증에 원본 바이트 필요) ──────
 // express.json() 적용 전에 등록해야 충돌 없음
 app.use(
@@ -67,6 +89,27 @@ app.use(
   express.raw({ type: 'application/json', limit: '5mb' }),
   webhookLimiter,
   webhookRouter,
+);
+
+// ── LMS Webhook: LMS → OpenMento Push 수신 (출결/성적 이벤트) ────────────────
+// raw Buffer 로 파싱하여 HMAC-SHA256 서명 검증에 사용합니다.
+app.use(
+  '/lms-webhook',
+  express.raw({ type: 'application/json', limit: '2mb' }),
+  // rawBody를 req에 주입하여 라우터에서 서명 검증에 활용
+  (req, _res, next) => {
+    if (Buffer.isBuffer(req.body)) {
+      (req as unknown as Record<string, unknown>).rawBody = req.body;
+      try {
+        req.body = JSON.parse(req.body.toString('utf-8'));
+      } catch {
+        req.body = {};
+      }
+    }
+    next();
+  },
+  webhookLimiter,
+  lmsWebhookRouter,
 );
 
 // ── 공개 엔드포인트 ───────────────────────────────────────
@@ -91,9 +134,12 @@ app.use('/student', chatLimiter, studentRouter);
 app.use('/instructor', adminLimiter, instructorRouter);
 app.use('/admin', adminLimiter, adminRouter);
 app.use('/portfolio', chatLimiter, portfolioRouter);
+app.use('/assignments', chatLimiter, assignmentsRouter);
+app.use('/portfolio-posts', chatLimiter, portfolioPostsRouter);
+app.use('/attendance', chatLimiter, attendanceRouter);
 // Phase 5-3: 온보딩 투어 완료 상태 관리
 app.use('/onboarding', chatLimiter, onboardingRouter);
-// Phase 5-2: Super Admin — 전체 교육기관 통합 관리 (super_admin 역할 전용)
+// 기관 관리 통일. /admin/institutions 등으로 사용 예정이지만 기존 엔드포인트 유지 용도
 app.use('/super-admin', adminLimiter, superAdminRouter);
 
 // ── BullMQ 큐 모니터링 대시보드 (Phase 5-1 개선 ①: DLQ + Admin UI) ──────────
@@ -149,6 +195,9 @@ createSocketServer(httpServer);
 
 httpServer.listen(PORT, () => {
   logger.info({ port: PORT }, '[api] OpenMento server listening');
+  // ── 기본 에이전트 스킬 레지스트리 로드 ─────────────────────────────
+  loadDefaultSkills();
+  watchSkillFiles();
   // ── EWS 임계치 DB 연결 + 프리워밍 (Phase 2 개선: 영속성 확보) ─
   // DB 인스턴스를 주입하고 저장된 모든 기관 임계치를 캐시에 적재합니다.
   // DB 접근 실패 시 기본값(60/75/90)으로 폴백하므로 서버 기동이 중단되지 않습니다.
@@ -161,14 +210,38 @@ httpServer.listen(PORT, () => {
     initInstitutionSettingsDb(db);
     await loadAllInstitutionSettings();
     logger.info('[institution-settings] DB 프리워밍 완료');
-    // DB에 저장된 API 키를 process.env에 복원 (기본 기관 기준)
-    const defaultSecrets = await getInstitutionSetting<Record<string, string>>('default', 'secrets', {});
-    if (defaultSecrets['openaiApiKey']) process.env.OPENAI_API_KEY = defaultSecrets['openaiApiKey'];
-    if (defaultSecrets['anthropicApiKey']) process.env.ANTHROPIC_API_KEY = defaultSecrets['anthropicApiKey'];
-    if (defaultSecrets['slackWebhookUrl']) process.env.SLACK_WEBHOOK_URL = defaultSecrets['slackWebhookUrl'];
+    // ── DB에 저장된 API 키를 process.env에 복원 (모든 기관 순회) ─────────
+    // tsx watch 재시작 시 런타임에만 설정된 env var가 사라지는 문제를 방지합니다.
+    // tutor-agent는 매 요청 시 secrets를 직접 읽으므로 이 복원은 EWS 등
+    // 기관 컨텍스트 없이 env를 읽는 서비스(포트폴리오, EWS 모니터 등)를 위한 폴백입니다.
+    type SecretsRecord = Record<string, string | undefined>;
+    const { institutionSettings, eq: eqOp } = await import('@openmento/db');
+    const allSecretRows = await db
+      .select({ institutionId: institutionSettings.institutionId, settingValue: institutionSettings.settingValue })
+      .from(institutionSettings)
+      .where(eqOp(institutionSettings.settingKey, 'secrets'));
+    /** 마스킹 문자(•, U+2022)가 포함된 값은 env에 절대 설정하지 않음 */
+    const isSafeKey = (v: string | undefined): v is string =>
+      typeof v === 'string' && v.length > 0 && !v.includes('\u2022');
+    for (const row of allSecretRows) {
+      const s = (row.settingValue ?? {}) as SecretsRecord;
+      if (isSafeKey(s['openaiApiKey']))    process.env.OPENAI_API_KEY = s['openaiApiKey'];
+      if (isSafeKey(s['anthropicApiKey'])) process.env.ANTHROPIC_API_KEY = s['anthropicApiKey'];
+      if (isSafeKey(s['openclawApiKey']))  process.env.OPENCLAW_API_KEY = s['openclawApiKey'];
+      if (isSafeKey(s['slackWebhookUrl'])) process.env.SLACK_WEBHOOK_URL = s['slackWebhookUrl'];
+      if (isSafeKey(s['geminiApiKey'])) {
+        process.env.GEMINI_API_KEY   = s['geminiApiKey'];
+        process.env.GOOGLE_API_KEY   = s['geminiApiKey'];
+        process.env.GOOGLE_AI_API_KEY = s['geminiApiKey'];
+      }
+      if (isSafeKey(s['ragGoogleApiKey'])) process.env.RAG_GOOGLE_API_KEY = s['ragGoogleApiKey'];
+      logger.info({ institutionId: row.institutionId }, '[secrets] process.env 복원 완료');
+    }
   })();
   // ── Heartbeat 스케줄러 기동 (Phase 2-1) ─────────────────────
   startHeartbeatScheduler();
+  // ── Heartbeat 프로액티브 스캔 기동 (AI 자율 발화) ────────────
+  startHeartbeatProactiveScheduler();
   // ── BullMQ Webhook Worker 기동 (Phase 2-5 개선 ①) ───────────
   // REDIS_URL 환경변수가 있을 때만 Worker가 시작되고, 없으면 null 반환
   startWebhookWorker();

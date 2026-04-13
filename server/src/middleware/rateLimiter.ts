@@ -13,14 +13,30 @@
 
 import rateLimit from 'express-rate-limit';
 
-/** 인증 라우트 (/auth/login, /auth/refresh) — 브루트포스 방어 */
+/**
+ * 인증 라우트 공통 Limiter — 브루트포스/과부하 방어
+ * 정상 사용자는 30회/15분으로 여유 있게 허용합니다.
+ */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15분
-  max: 20,                     // 15분당 최대 20회 (IP 기준)
-  standardHeaders: 'draft-7', // RateLimit-* 헤더 포함 (RFC 표준 초안)
+  max: 30,                    // 15분 내 최대 30회 (정상 사용 범위)
+  standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
-  skipSuccessfulRequests: false,
+});
+
+/**
+ * 로그인 실패 전용 Limiter — 계정 잠금(Brute-force) 방어
+ * 성공 요청은 카운트 제외, 실패 5회 초과 시 10분 잠금.
+ * /auth/login 과 /auth/student-login 에만 적용합니다.
+ */
+export const loginFailureLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,  // 10분
+  max: 5,                     // 실패 5회 초과 시 잠금 (IP 기준)
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+  skipSuccessfulRequests: true, // ← 로그인 성공 요청은 카운트 제외
 });
 
 /** 채팅(LLM 스트리밍) 라우트 — AI 토큰 비용 고갈 방어 */

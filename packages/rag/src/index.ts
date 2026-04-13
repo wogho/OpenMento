@@ -2,7 +2,14 @@
 export { parseDocument, parsePdf, parseMarkdown, parsePlainText } from './chunker.js';
 export type { TextChunk, ParseResult, SourceType } from './chunker.js';
 
-export { embedText, embedBatch, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from './embedder.js';
+export {
+	embedText,
+	embedBatch,
+	embedBatchWithProvider,
+	EMBEDDING_MODEL,
+	EMBEDDING_DIMENSIONS,
+} from './embedder.js';
+export type { EmbeddingProvider } from './embedder.js';
 
 export { searchSimilarChunks, formatSearchResultsAsContext } from './search.js';
 export type { SearchOptions, SearchResult } from './search.js';

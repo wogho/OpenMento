@@ -12,7 +12,7 @@
  *   GET    /super-admin/stats                 — 플랫폼 전체 통계
  *   GET    /super-admin/institutions/:id/stats — 특정 기관 통계
  *
- * 보안: authenticate + requireRole('super_admin') 로 이중 보호
+ * 보안: authenticate + requireRole('admin') 로 이중 보호
  */
 
 import { Router } from 'express';
@@ -35,9 +35,9 @@ import {
 
 const router: ReturnType<typeof Router> = Router();
 
-// 모든 /super-admin/* 에 인증 + super_admin 역할 전용 검증
+// 모든 /super-admin/* 에 인증 + admin 역할 전용 검증
 router.use(authenticate);
-router.use(requireRole('super_admin'));
+router.use(requireRole('admin'));
 
 // ─── 스키마 ────────────────────────────────────────────────────────────────────
 

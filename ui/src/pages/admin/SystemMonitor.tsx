@@ -18,7 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { io as ioConnect, type Socket } from 'socket.io-client';
 import { useAuth } from '../../hooks/useAuth';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
 

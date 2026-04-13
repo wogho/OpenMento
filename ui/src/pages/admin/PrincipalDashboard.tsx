@@ -12,8 +12,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { Users, AlertCircle, DollarSign, CalendarCheck, Loader2 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 interface RiskStudent {
   studentId: string;
@@ -38,7 +39,7 @@ function KpiCard({
   sub,
   accent,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   value: string;
   sub?: string;
@@ -51,12 +52,12 @@ function KpiCard({
     'border-l-blue-400';
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border-l-4 ${accentCls} p-5 flex items-center gap-4`}>
+    <div className={`bg-white/70 dark:bg-slate-800/70 backdrop-blur-lg rounded-2xl shadow-[0_4px_24px_rgb(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgb(0,0,0,0.2)] border border-gray-100/80 dark:border-slate-700/50 border-l-4 ${accentCls} p-5 flex items-center gap-4 transition-all duration-200 hover:shadow-[0_8px_32px_rgb(0,0,0,0.08)] hover:-translate-y-0.5`}>
       <span className="text-3xl">{icon}</span>
       <div>
-        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-        <p className="text-2xl font-extrabold text-gray-900 leading-tight">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 leading-tight">{value}</p>
+        {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
       </div>
     </div>
   );
@@ -74,17 +75,17 @@ function RiskRow({ student }: { student: RiskStudent }) {
   });
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+    <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-slate-700 last:border-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600">
+        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300">
           {student.studentId.slice(0, 2).toUpperCase()}
         </div>
-        <span className="text-sm text-gray-700 font-mono">{student.studentId.slice(0, 12)}…</span>
+        <span className="text-sm text-gray-700 dark:text-gray-300 font-mono">{student.studentId.slice(0, 12)}…</span>
       </div>
       <div className="flex items-center gap-3">
         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeCls}`}>{label}</span>
-        <span className="text-sm font-bold text-gray-800">{score}점</span>
-        <span className="text-xs text-gray-400">{date}</span>
+        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{score}점</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">{date}</span>
       </div>
     </div>
   );
@@ -109,15 +110,15 @@ export default function PrincipalDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
-        <span className="animate-spin mr-2">⏳</span> 로딩 중…
+      <div className="flex items-center justify-center py-24 text-gray-400 dark:text-gray-500 text-sm">
+        <Loader2 size={16} className="animate-spin mr-2 inline-block" /> 로딩 중...
       </div>
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-600 text-sm">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center text-red-600 dark:text-red-400 text-sm">
         대시보드 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
       </div>
     );
@@ -131,29 +132,29 @@ export default function PrincipalDashboard() {
   return (
     <div className="space-y-6">
       {/* KPI 카드 그리드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          icon=""
+          icon={<Users size={28} className="text-blue-500" />}
           label="전체 수강생"
           value={`${data.totalStudents}명`}
           accent="blue"
         />
         <KpiCard
-          icon="️"
+          icon={<AlertCircle size={28} className={data.atRiskCount > 0 ? "text-red-500" : "text-green-500"} />}
           label="위험 수강생"
           value={`${data.atRiskCount}명`}
           sub="최근 30일 EWS ≥ 60"
           accent={data.atRiskCount > 0 ? 'red' : 'green'}
         />
         <KpiCard
-          icon=""
+          icon={<DollarSign size={28} className="text-yellow-500" />}
           label="이번 달 AI 비용"
           value={costStr}
           sub="cost_events 합계"
           accent="yellow"
         />
         <KpiCard
-          icon=""
+          icon={<CalendarCheck size={28} className="text-blue-500" />}
           label="이번 달 출결율"
           value={data.attendanceRate != null ? `${data.attendanceRate}%` : '—'}
           accent={
@@ -168,8 +169,8 @@ export default function PrincipalDashboard() {
       {/* ── 데이터 시각화 (Recharts) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* EWS 위험도 트렌드 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-[360px]">
-          <h2 className="text-base font-bold text-gray-800 mb-4 h-6"> 최근 6개월 EWS 위험도 트렌드</h2>
+        <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-lg rounded-2xl shadow-[0_4px_24px_rgb(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgb(0,0,0,0.2)] border border-gray-100/80 dark:border-slate-700/50 p-6 flex flex-col h-[360px]">
+          <h2 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4 h-6"> 최근 6개월 EWS 위험도 트렌드</h2>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
@@ -209,8 +210,8 @@ export default function PrincipalDashboard() {
         </div>
 
         {/* 학생별 출결 분포 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-[360px]">
-          <h2 className="text-base font-bold text-gray-800 mb-4 h-6"> 주간 출결 분포 현황</h2>
+        <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-lg rounded-2xl shadow-[0_4px_24px_rgb(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgb(0,0,0,0.2)] border border-gray-100/80 dark:border-slate-700/50 p-6 flex flex-col h-[360px]">
+          <h2 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4 h-6"> 주간 출결 분포 현황</h2>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -242,8 +243,8 @@ export default function PrincipalDashboard() {
       </div>
 
       {/* 위험 수강생 목록 */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
+      <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-lg rounded-2xl shadow-[0_4px_24px_rgb(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgb(0,0,0,0.2)] border border-gray-100/80 dark:border-slate-700/50 p-6">
+        <h2 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2">
           <span></span> 최근 위험 수강생 Top 10
           <span className="ml-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
             {data.atRiskCount}명
@@ -251,7 +252,7 @@ export default function PrincipalDashboard() {
         </h2>
 
         {data.recentRiskStudents.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm">
+          <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
              현재 위험 수강생이 없습니다.
           </div>
         ) : (

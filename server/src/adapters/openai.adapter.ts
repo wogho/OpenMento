@@ -15,7 +15,7 @@ export class OpenAiAdapter implements ILlmAdapter {
   private readonly timeoutMs: number;
 
   constructor(config: AdapterConfig) {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = config.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY 환경변수가 설정되지 않았습니다.');
     }

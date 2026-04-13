@@ -17,7 +17,7 @@
  *
  *   REDIS_URL      — Redis 연결 URL (필수)
  *   DATABASE_URL   — PostgreSQL 연결 URL (필수)
- *   OPENAI_API_KEY — OpenAI API 키 (임베딩 생성 필수)
+ *   OPENAI_API_KEY — 기본 OpenAI API 키 (OpenAI 선택 시 fallback)
  *   UPLOAD_TMP_DIR — API 서버와 공유하는 임시 파일 볼륨 경로 (기본: /tmp)
  *
  * ── 재시도 정책 ────────────────────────────────────────────────────────────────
@@ -48,11 +48,6 @@ if (!REDIS_URL) {
   process.exit(1);
 }
 
-if (!process.env.OPENAI_API_KEY) {
-  logger.fatal('OPENAI_API_KEY 환경변수가 설정되지 않았습니다. rag-worker를 시작할 수 없습니다.');
-  process.exit(1);
-}
-
 const RAG_INGEST_QUEUE_NAME = 'rag-ingest';
 
 // ── Redis 연결 설정 ────────────────────────────────────────────────────────────
@@ -72,13 +67,29 @@ function parseRedisUrl(redisUrl: string) {
 const worker = new Worker<{
   institutionId: string;
   courseId?: string;
+  category?: string;
+  tags?: string[];
+  enableRag?: boolean;
+  embeddingProvider?: 'openai' | 'cohere' | 'google';
+  embeddingApiKey?: string;
   fileName: string;
   filePath: string;
   deliveryId: string;
 }>(
   RAG_INGEST_QUEUE_NAME,
   async (job) => {
-    const { institutionId, courseId, fileName, filePath, deliveryId } = job.data;
+    const {
+      institutionId,
+      courseId,
+      category,
+      tags,
+      enableRag,
+      embeddingProvider,
+      embeddingApiKey,
+      fileName,
+      filePath,
+      deliveryId,
+    } = job.data;
 
     logger.info(
       { jobId: job.id, deliveryId, fileName, institutionId, attempt: job.attemptsMade + 1 },
@@ -96,8 +107,13 @@ const worker = new Worker<{
     const result = await ingestDocument({
       institutionId,
       courseId,
+      category,
+      tags,
       fileName,
       filePath,
+      enableRag,
+      embeddingProvider,
+      embeddingApiKey,
       // ── Phase 5-1 개선 ③: DB 배치 저장마다 진행률 갱신 ──────────────────
       // QueueEvents → socket.io 'rag:progress' → Admin 대시보드 진행률 바 업데이트
       onProgress: async (current, total) => {

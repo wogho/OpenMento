@@ -8,6 +8,8 @@ import * as Sentry from '@sentry/react';
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
 
+import { ThemeProvider } from './components/theme-provider';
+
 // ── PostHog Analytics 셋업 (Phase 6-3) ──────────────────────────────
 posthog.init(import.meta.env.VITE_POSTHOG_KEY || 'phc_mock_key_for_openmento', {
   api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com',
@@ -51,11 +53,13 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <PostHogProvider client={posthog}>
-          <App />
-        </PostHogProvider>
-      </QueryClientProvider>
+      <ThemeProvider defaultTheme="system" storageKey="openmento-ui-theme">
+        <QueryClientProvider client={queryClient}>
+          <PostHogProvider client={posthog}>
+            <App />
+          </PostHogProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

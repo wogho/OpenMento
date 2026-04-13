@@ -5,6 +5,7 @@ import {
   boolean,
   uuid,
   index,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { institutions } from './institutions.js';
@@ -27,6 +28,8 @@ export const instructorSkills = pgTable('instructor_skills', {
   title: text('title').notNull(),
   // System Prompt에 주입되는 마크다운 컨텐츠
   markdown: text('markdown').notNull(),
+  // 스킬 생태계 확장을 위한 태그 및 교재 연동 (Phase 7-C)
+  tags: jsonb('tags').$type<string[]>(), 
   isActive: boolean('is_active').notNull().default(true),
   // GitHub 임포트 추적 (sourceRef = git commit hash)
   sourceRef: text('source_ref'),

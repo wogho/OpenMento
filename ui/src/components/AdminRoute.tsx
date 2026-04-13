@@ -16,10 +16,10 @@ export default function AdminRoute({ children }: AdminRouteProps) {
   const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/login/admin" state={{ from: location }} replace />;
   }
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'teacher') {
     return <Navigate to="/chat" replace />;
   }
 

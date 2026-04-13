@@ -15,6 +15,8 @@ import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { tutorChat } from '../services/tutor-agent.js';
+import { triggerDebateChain } from '../services/heartbeat-proactive.js';
+import { db, instructorSkills, studentAgentPreferences, eq, and, asc, isNull } from '@openmento/db';
 
 interface JwtPayload {
   sub: string;
@@ -27,6 +29,7 @@ interface ChatMessagePayload {
   agentId: string;
   sessionId?: string;
   courseId?: string;
+  debateMode?: boolean;
 }
 
 let io: SocketServer | null = null;
@@ -124,11 +127,58 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
     }
     // ── 채팅 메시지 수신 → LLM 스트리밍 응답 ─────────────
     socket.on('chat_message', async (payload: ChatMessagePayload) => {
-      const { question, agentId, sessionId, courseId } = payload ?? {};
+      if (socket.data.role !== 'student') {
+        socket.emit('chat_error', { message: '수강생 채팅은 학생 계정으로만 사용할 수 있습니다. /auth/student-login으로 로그인해 주세요.' });
+        return;
+      }
+
+      const { question, sessionId, courseId, debateMode } = payload ?? {};
+      let { agentId } = payload ?? {};
 
       if (!question || !agentId) {
         socket.emit('chat_error', { message: '필수 파라미터가 누락되었습니다.' });
         return;
+      }
+
+      // courseId가 있으면 수강생별 활성 에이전트 집합으로 강제합니다.
+      if (courseId) {
+        const rows = await db
+          .select({
+            skillAgentId: instructorSkills.agentId,
+            prefIsActive: studentAgentPreferences.isActive,
+          })
+          .from(instructorSkills)
+          .leftJoin(
+            studentAgentPreferences,
+            and(
+              eq(studentAgentPreferences.studentId, userId),
+              eq(studentAgentPreferences.courseId, courseId),
+              eq(studentAgentPreferences.agentId, instructorSkills.agentId),
+            ),
+          )
+          .where(
+            and(
+              eq(instructorSkills.courseId, courseId),
+              eq(instructorSkills.isActive, true),
+              isNull(instructorSkills.deletedAt),
+            ),
+          )
+          .orderBy(asc(instructorSkills.createdAt));
+
+        const allowedAgentIds = Array.from(new Set(
+          rows
+            .filter((r) => r.skillAgentId && r.prefIsActive !== false)
+            .map((r) => r.skillAgentId as string),
+        ));
+
+        if (allowedAgentIds.length === 0) {
+          socket.emit('chat_error', { message: '활성화된 에이전트가 없습니다. 채팅 메뉴에서 에이전트를 먼저 활성화해 주세요.' });
+          return;
+        }
+
+        if (!allowedAgentIds.includes(agentId)) {
+          agentId = allowedAgentIds[0]!;
+        }
       }
 
       // "AI가 답변 중..." 타이핑 인디케이터 시작
@@ -163,6 +213,18 @@ export function createSocketServer(httpServer: HttpServer): SocketServer {
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
         });
+
+        // 토론 모드: 다른 heartbeat 활성 에이전트들이 동일 질문에 대해 각자의 시각으로 답변
+        if (debateMode && courseId) {
+          void triggerDebateChain({
+            question,
+            primaryAgentId: agentId,
+            primaryAnswer: result.answer,
+            studentId: userId,
+            courseId,
+            institutionId,
+          });
+        }
       } catch (err) {
         socket.emit('chat_error', {
           message: err instanceof Error ? err.message : '답변 생성 중 오류가 발생했습니다.',

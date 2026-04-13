@@ -24,7 +24,7 @@ import OriginalityGauge, { type SimilarityVerdict } from '../components/portfoli
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 // ── 타입 ─────────────────────────────────────────────────────────────────────
 

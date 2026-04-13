@@ -1,37 +1,73 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { motion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  // Base — Apple HIG: precise radius, SF typography, spring press
+  [
+    "inline-flex items-center justify-center whitespace-nowrap",
+    "text-[13px] font-medium leading-none tracking-[-0.01em]",
+    "rounded-[8px] select-none",
+    "transition-all duration-150 ease-out active:scale-[0.97]",
+    "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#007AFF]/40 focus-visible:ring-offset-0",
+    "disabled:pointer-events-none disabled:opacity-40",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        // macOS AccentColor filled button
+        default: [
+          "bg-[#007AFF] text-white",
+          "shadow-[0_1px_3px_rgba(0,122,255,0.4),inset_0_1px_0_rgba(255,255,255,0.18)]",
+          "hover:bg-[#0071E3] active:bg-[#0068D0]",
+          "dark:bg-[#0A84FF] dark:hover:bg-[#0076E4] dark:active:bg-[#006BCC]",
+          "dark:focus-visible:ring-[#0A84FF]/40",
+        ].join(" "),
+        // macOS destructive button
+        destructive: [
+          "bg-[#FF3B30] text-white",
+          "shadow-[0_1px_3px_rgba(255,59,48,0.35),inset_0_1px_0_rgba(255,255,255,0.16)]",
+          "hover:bg-[#E0352B] active:bg-[#CC2F26]",
+          "dark:bg-[#FF453A] dark:hover:bg-[#E33E34]",
+          "focus-visible:ring-[#FF3B30]/40",
+        ].join(" "),
+        // AppKit bordered/bezel button
+        outline: [
+          "border border-[rgba(0,0,0,0.12)] bg-white text-[#007AFF]",
+          "shadow-[0_1px_2px_rgba(0,0,0,0.06)]",
+          "hover:bg-[rgba(0,122,255,0.05)] active:bg-[rgba(0,122,255,0.1)]",
+          "dark:border-[rgba(255,255,255,0.12)] dark:bg-[#1C1C1E] dark:text-[#0A84FF]",
+          "dark:hover:bg-[rgba(10,132,255,0.1)]",
+        ].join(" "),
+        // AppKit secondary / muted
+        secondary: [
+          "bg-[rgba(120,120,128,0.12)] text-[rgba(0,0,0,0.8)]",
+          "hover:bg-[rgba(120,120,128,0.18)] active:bg-[rgba(120,120,128,0.24)]",
+          "dark:bg-[rgba(120,120,128,0.24)] dark:text-[rgba(255,255,255,0.8)]",
+          "dark:hover:bg-[rgba(120,120,128,0.32)]",
+        ].join(" "),
+        // AppKit borderless / plain button
+        ghost: [
+          "bg-transparent text-[#007AFF]",
+          "hover:bg-[rgba(0,122,255,0.08)] active:bg-[rgba(0,122,255,0.14)]",
+          "dark:text-[#0A84FF] dark:hover:bg-[rgba(10,132,255,0.12)]",
+        ].join(" "),
+        link: "bg-transparent text-[#007AFF] underline-offset-4 hover:underline dark:text-[#0A84FF]",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-[34px] px-[14px] py-0",
+        sm:      "h-[28px] px-[10px] text-[12px] rounded-[7px]",
+        lg:      "h-[40px] px-[20px] text-[15px] rounded-[10px]",
+        icon:    "h-[34px] w-[34px] p-0",
       },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
     },
-  }
+  },
 )
 
 export interface ButtonProps
@@ -43,20 +79,14 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
-    
-    // Apply Framer Motion micro-interaction haptic feedback globally
-    const MotionComp = motion.create(Comp) as React.ElementType;
-
     return (
-      <MotionComp
+      <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        whileTap={{ scale: 0.95 }}
-        transition={{ type: "spring", stiffness: 400, damping: 17 }}
         {...props}
       />
     )
-  }
+  },
 )
 Button.displayName = "Button"
 

@@ -23,8 +23,8 @@ export type TourId = 'admin-tour' | 'student-tour' | 'portfolio-tour' | 'ews-tou
 
 export interface TourScenario {
   tourId: TourId;
-  /** 대상 역할 */
-  roles: Array<'admin' | 'instructor' | 'student'>;
+  /** 대상 역할 ('teacher'과 'instructor'는 동일 역할의 영문/한국어 별칭) */
+  roles: Array<'admin' | 'teacher' | 'instructor' | 'student'>;
   /** 투어 진입 경로 (투어를 시작할 페이지) */
   entryPath: string;
   steps: DriveStep[];
@@ -34,7 +34,7 @@ export interface TourScenario {
 
 export const adminTour: TourScenario = {
   tourId: 'admin-tour',
-  roles: ['admin', 'instructor'],
+  roles: ['admin', 'teacher', 'instructor'],  // 'teacher' = 'instructor' 업무 역할 (양측 별칭 지원)
   entryPath: '/admin',
   steps: [
     {
@@ -163,7 +163,7 @@ export const portfolioTour: TourScenario = {
 
 export const ewsTour: TourScenario = {
   tourId: 'ews-tour',
-  roles: ['admin', 'instructor'],
+  roles: ['admin', 'teacher'],
   entryPath: '/admin',
   steps: [
     {
@@ -205,6 +205,6 @@ export const ewsTour: TourScenario = {
 export const ALL_TOURS: TourScenario[] = [adminTour, studentTour, portfolioTour, ewsTour];
 
 /** 사용자 역할에 따라 실행할 투어 시나리오를 반환합니다. */
-export function getTourForRole(role: 'admin' | 'instructor' | 'student'): TourScenario | undefined {
-  return ALL_TOURS.find((t) => t.roles.includes(role));
+export function getTourForRole(role: string): TourScenario | undefined {
+  return ALL_TOURS.find((t) => t.roles.includes(role as any));
 }

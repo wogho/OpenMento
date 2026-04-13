@@ -15,6 +15,7 @@ import { useLocation } from 'react-router-dom';
 import { useOnboarding } from '../hooks/useOnboarding';
 import { useFeatureTour } from '../hooks/useFeatureTour';
 import { useAuth } from './/../hooks/useAuth';
+import { HelpCircle, PanelTop, AlertTriangle } from 'lucide-react';
 
 export default function OnboardingTour() {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ export default function OnboardingTour() {
     'ews-tour',
     () =>
       location.pathname.startsWith('/admin') &&
-      (user?.role === 'admin' || user?.role === 'instructor'),
+      (user?.role === 'admin' || user?.role === 'teacher'),
   );
 
   if (!user) return null;
@@ -42,7 +43,7 @@ export default function OnboardingTour() {
   const isAnyRunning = roleRunning || portfolioRunning || ewsRunning;
   const isOnPortfolio = location.pathname === '/portfolio';
   const isOnAdmin = location.pathname.startsWith('/admin');
-  const canEws = user.role === 'admin' || user.role === 'instructor';
+  const canEws = user.role === 'admin' || user.role === 'teacher';
 
   return (
     <>
@@ -66,7 +67,7 @@ export default function OnboardingTour() {
               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
             "
           >
-            
+            <HelpCircle size={20} />
           </button>
 
           {/* 포트폴리오 페이지에서만 표시 */}
@@ -84,7 +85,7 @@ export default function OnboardingTour() {
                 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2
               "
             >
-              
+              <PanelTop size={20} />
             </button>
           )}
 
@@ -103,7 +104,7 @@ export default function OnboardingTour() {
                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2
               "
             >
-              
+              <AlertTriangle size={20} />
             </button>
           )}
         </div>

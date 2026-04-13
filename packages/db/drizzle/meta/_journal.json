@@ -113,6 +113,62 @@
       "when": 1775835362327,
       "tag": "0015_unknown_naoko",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1775854429409,
+      "tag": "0016_careful_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1775899611524,
+      "tag": "0017_dear_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1775912856366,
+      "tag": "0018_white_paladin",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1775927586056,
+      "tag": "0019_curly_raider",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1775947387769,
+      "tag": "0020_daily_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1775976209341,
+      "tag": "0021_outgoing_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1776013931881,
+      "tag": "0022_curvy_greymalkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776023792030,
+      "tag": "0023_romantic_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

@@ -19,7 +19,7 @@ import { useAuth } from './useAuth';
 import { useChatStore } from '../store/chatStore';
 
 // 공개 타입을 스토어에서 재-익스포트 (하위 호환 유지)
-export type { ChatMessage, RagSource, ConnectionStatus } from '../store/chatStore';
+export type { ChatMessage, RagSource, ConnectionStatus, AssignmentCardPayload } from '../store/chatStore';
 
 interface ChatDonePayload {
   sessionId: string;
@@ -35,6 +35,14 @@ interface CodeReviewArrivedPayload {
   repo: string;
   event: 'push' | 'pull_request';
   preview: string;
+}
+
+interface AssignmentPostedPayload {
+  assignmentId: string;
+  title: string;
+  dueAt: string | null;
+  courseId: string;
+  courseName: string;
 }
 
 // 모듈 레벨 싱글턴 소켓 — 컴포넌트 언마운트 후에도 연결을 유지한다.
@@ -66,9 +74,10 @@ export function getSharedSocket(token: string): Socket {
 interface UseChatOptions {
   agentId: string;
   courseId?: string;
+  debateMode?: boolean;
 }
 
-export function useChat({ agentId, courseId }: UseChatOptions) {
+export function useChat({ agentId, courseId, debateMode }: UseChatOptions) {
   const { token } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   // 현재 스트리밍 중인 AI 메시지 ID
@@ -160,6 +169,29 @@ export function useChat({ agentId, courseId }: UseChatOptions) {
       store.setSessionId(data.sessionId);
     };
 
+    /** 과제 등록 알림: 수강생 채팅창에 과제 카드 추가 */
+    const onAssignmentPosted = (data: AssignmentPostedPayload) => {
+      useChatStore.getState().addMessage({
+        id: crypto.randomUUID(),
+        role: 'assignment_card',
+        content: '',
+        assignmentCard: data,
+        createdAt: new Date(),
+      });
+    };
+
+    /** 자율 발화(Proactive Heartbeat) 메시지 수신 */
+    const onHeartbeatMessage = (data: { messageId: string; agentId: string; agentName: string; body: string }) => {
+      useChatStore.getState().addMessage({
+        id: data.messageId,
+        role: 'assistant',
+        content: data.body,
+        isAutoMessage: true,
+        agentName: data.agentName,
+        createdAt: new Date(),
+      });
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.io.on('reconnect_attempt', onReconnectAttempt);
@@ -168,6 +200,8 @@ export function useChat({ agentId, courseId }: UseChatOptions) {
     socket.on('chat_done', onDone);
     socket.on('chat_error', onChatError);
     socket.on('code_review_arrived', onCodeReviewArrived);
+    socket.on('assignment_posted', onAssignmentPosted);
+    socket.on('heartbeat_message', onHeartbeatMessage);
 
     return () => {
       socket.off('connect', onConnect);
@@ -178,6 +212,8 @@ export function useChat({ agentId, courseId }: UseChatOptions) {
       socket.off('chat_done', onDone);
       socket.off('chat_error', onChatError);
       socket.off('code_review_arrived', onCodeReviewArrived);
+      socket.off('assignment_posted', onAssignmentPosted);
+      socket.off('heartbeat_message', onHeartbeatMessage);
     };
   }, [token]); // token 변경 시만 재바인딩 — 상태는 getState()로 직접 접근
 
@@ -199,9 +235,10 @@ export function useChat({ agentId, courseId }: UseChatOptions) {
         agentId,
         sessionId: store.sessionId ?? undefined,
         courseId,
+        debateMode: debateMode ?? false,
       });
     },
-    [agentId, courseId],
+    [agentId, courseId, debateMode],
   );
 
   return {
@@ -212,5 +249,6 @@ export function useChat({ agentId, courseId }: UseChatOptions) {
     connectionStatus,
     sendMessage,
     clearSession: useChatStore.getState().clearSession,
+    clearMessages: useChatStore.getState().clearMessages,
   };
 }

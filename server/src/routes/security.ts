@@ -187,27 +187,27 @@ const RBAC_MAP: EndpointRbacEntry[] = [
   {
     path: '/onboarding/status',
     methods: ['GET'],
-    requiredRoles: ['student', 'instructor', 'admin', 'super_admin'],
+    requiredRoles: ['student', 'instructor', 'admin'],
     rateLimiter: 'chatLimiter',
   },
   {
     path: '/onboarding/progress',
     methods: ['PATCH'],
-    requiredRoles: ['student', 'instructor', 'admin', 'super_admin'],
+    requiredRoles: ['student', 'instructor', 'admin'],
     rateLimiter: 'chatLimiter',
-    notes: 'Phase 5-5: 투어별 역할 추가 제한 (admin-tour: admin/super_admin만)',
+    notes: 'Phase 5-5: 투어별 역할 추가 제한 (admin-tour: admin만)',
   },
   {
     path: '/onboarding/complete',
     methods: ['POST'],
-    requiredRoles: ['student', 'instructor', 'admin', 'super_admin'],
+    requiredRoles: ['student', 'instructor', 'admin'],
     rateLimiter: 'chatLimiter',
     notes: 'Phase 5-5: 투어별 역할 추가 제한 (ews-tour: instructor 이상)',
   },
   {
     path: '/super-admin/*',
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    requiredRoles: ['super_admin'],
+    requiredRoles: ['admin'],
     rateLimiter: 'adminLimiter',
   },
   {

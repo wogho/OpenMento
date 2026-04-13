@@ -70,7 +70,7 @@ function buildSlackPayload(
     const anonId = s.studentId.slice(0, 8).toUpperCase();
     const detail =
       `출결 +${s.components.attendance}  과제 +${s.components.assignment}  ` +
-      `상담 +${s.components.counseling}  튜터 +${s.components.tutorUsage}`;
+      `상담 +${s.components.counseling}  AI참여 +${s.components.aiInteraction}`;
     return `*${label}* | 수강생 \`…${anonId}\` | 위험점수 *${s.totalScore}점*\n> ${detail}`;
   });
 

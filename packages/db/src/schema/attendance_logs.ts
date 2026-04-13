@@ -6,10 +6,13 @@ import {
   pgEnum,
   date,
   index,
+  smallint,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { students } from './students.js';
 import { courses } from './courses.js';
+import { adminUsers } from './admin_users.js';
 
 export const attendanceStatusEnum = pgEnum('attendance_status', [
   'present',
@@ -17,6 +20,29 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
   'late',
   'excused',
 ]);
+
+// ── 출석 세션 (강사가 열어주는 단위) ──────────────────────────────────────
+export const attendanceSessions = pgTable('attendance_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  courseId: uuid('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  instructorId: uuid('instructor_id').notNull().references(() => adminUsers.id, { onDelete: 'cascade' }),
+  weekNo: smallint('week_no').notNull(),
+  sessionNo: smallint('session_no').notNull(),
+  sessionDate: date('session_date').notNull(),
+  isOpen: boolean('is_open').notNull().default(true),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+});
+
+// ── QR 토큰 (일회성, 만료) ─────────────────────────────────────────────────
+export const qrTokens = pgTable('qr_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id').notNull().references(() => attendanceSessions.id, { onDelete: 'cascade' }),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedCount: smallint('used_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const attendanceLogs = pgTable('attendance_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -27,6 +53,10 @@ export const attendanceLogs = pgTable('attendance_logs', {
     .notNull()
     .references(() => courses.id, { onDelete: 'cascade' }),
   attendanceDate: date('attendance_date').notNull(),
+  weekNo: smallint('week_no'),
+  sessionNo: smallint('session_no'),
+  checkMethod: text('check_method').default('manual'), // 'manual' | 'self' | 'qr'
+  recordedBy: uuid('recorded_by'), // instructor id or student id
   status: attendanceStatusEnum('status').notNull(),
   // MCP 외부 연동 출처 (audit_logs 연계)
   sourceSystem: text('source_system'), // 'lms', 'manual', 'mcp'
@@ -62,5 +92,17 @@ export const attendanceLogsRelations = relations(attendanceLogs, ({ one }) => ({
   }),
 }));
 
+export const attendanceSessionsRelations = relations(attendanceSessions, ({ one, many }) => ({
+  course: one(courses, { fields: [attendanceSessions.courseId], references: [courses.id] }),
+  instructor: one(adminUsers, { fields: [attendanceSessions.instructorId], references: [adminUsers.id] }),
+  qrTokens: many(qrTokens),
+}));
+
+export const qrTokensRelations = relations(qrTokens, ({ one }) => ({
+  session: one(attendanceSessions, { fields: [qrTokens.sessionId], references: [attendanceSessions.id] }),
+}));
+
 export type AttendanceLog = typeof attendanceLogs.$inferSelect;
 export type NewAttendanceLog = typeof attendanceLogs.$inferInsert;
+export type AttendanceSession = typeof attendanceSessions.$inferSelect;
+export type QrToken = typeof qrTokens.$inferSelect;

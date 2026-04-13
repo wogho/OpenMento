@@ -9,10 +9,17 @@
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import type { AuthUser } from '../hooks/useAuth';
 
 interface LoginForm {
   email: string;
   password: string;
+}
+
+function getRedirectPath(user: AuthUser | null): string {
+  if (!user) return '/chat';
+  if (user.role === 'admin' || user.role === 'teacher') return '/admin';
+  return '/chat';
 }
 
 export default function LoginPage() {
@@ -28,7 +35,10 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     try {
       await login(data.email, data.password);
-      navigate('/chat', { replace: true });
+      // role은 login() 완료 후 context에 반영되므로 JWT를 직접 파싱
+      const token = localStorage.getItem('openmento_token');
+      const decoded: AuthUser | null = token ? JSON.parse(atob(token.split('.')[1])) : null;
+      navigate(getRedirectPath(decoded), { replace: true });
     } catch (err) {
       setError('root', {
         message: err instanceof Error ? err.message : '로그인에 실패했습니다.',

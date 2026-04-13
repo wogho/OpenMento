@@ -31,11 +31,11 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://api:3000',
+        target: 'http://localhost:3000',
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/socket.io': {
-        target: 'http://api:3000',
+        target: 'http://localhost:3000',
         ws: true,
       },
     },

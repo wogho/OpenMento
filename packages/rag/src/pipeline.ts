@@ -16,6 +16,7 @@ import { dirname, join } from 'path';
 import { unlink } from 'fs/promises';
 import { db, ragDocuments } from '@openmento/db';
 import type { WorkerInput, WorkerOutput, WorkerError } from './embed-worker.js';
+import type { EmbeddingProvider } from './embedder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,14 +27,20 @@ export interface IngestOptions {
   courseId?: string;
   fileName: string;   // 원본 파일명 (확장자 판별용)
   filePath: string;   // OS 임시 디렉토리의 물리 파일 경로
+  category?: string;  // 선택 메뉴(IDE 탐색기 스타일 등) 표시를 위한 분류
+  tags?: string[];    // 스킬 매핑 및 문서 필터링에 사용될 태그 배열
+  /**
+   * RAG 임베딩 활성화 여부 (기본: true)
+   * false 이면 파싱/청킹 없이 파일 참조 stub 행만 저장합니다.
+   * 단순 학생 열람용 또는 에이전트 직접 분석용 PDF에 사용합니다.
+   */
+  enableRag?: boolean;
+  /** 임베딩 프로바이더 ('openai' | 'cohere' | 'google', 기본: 'openai') */
+  embeddingProvider?: EmbeddingProvider;
+  /** 해당 프로바이더 API 키 (미지정 시 환경변수 OPENAI_API_KEY 사용) */
+  embeddingApiKey?: string;
   /**
    * 청크 DB 저장 진행률 콜백 (Phase 5-1 개선 ③ — Chunking 컨텍스트 추적)
-   *
-   * current: 현재까지 저장된 청크 수
-   * total:   전체 청크 수
-   *
-   * BullMQ rag-worker에서 job.updateProgress()로 연결되어
-   * QueueEvents → socket.io 'rag:progress' 이벤트로 Admin UI에 실시간 송출됩니다.
    */
   onProgress?: (current: number, total: number) => Promise<void>;
 }
@@ -87,13 +94,27 @@ function runIngestWorker(input: WorkerInput): Promise<WorkerOutput> {
 export async function ingestDocument(
   options: IngestOptions,
 ): Promise<IngestResult> {
-  const { institutionId, courseId, fileName, filePath, onProgress } = options;
+  const {
+    institutionId,
+    courseId,
+    fileName,
+    filePath,
+    category,
+    tags,
+    enableRag = true,
+    embeddingProvider,
+    embeddingApiKey,
+    onProgress,
+  } = options;
 
   try {
     // 파싱 + 청킹 + 임베딩 — 전부 워커 스레드에서 처리 (메인 루프 블로킹 없음)
     const { chunks, embeddings, sourceType } = await runIngestWorker({
       filePath,
       fileName,
+      enableRag,
+      embeddingProvider,
+      embeddingApiKey,
     });
 
     if (chunks.length === 0) {
@@ -108,12 +129,14 @@ export async function ingestDocument(
     // DB 저장 (배치 크기 50으로 나눠 insert — DB 부하 조절)
     const rows = chunks.map((chunk, i) => ({
       institutionId,
-      courseId: courseId ?? null,
+      courseId: courseId || null,
       sourceFileName: fileName,
       sourceType,
+      category: category || null,
+      tags: tags ?? null,
       chunkIndex: chunk.chunkIndex,
       chunkText: chunk.text,
-      embedding: embeddings[i] ?? [],
+      embedding: enableRag ? (embeddings[i] ?? []) : null,
       pageNumber: chunk.pageNumber ?? null,
       tokenCount: chunk.tokenCount,
     }));

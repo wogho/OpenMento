@@ -12,6 +12,14 @@ export interface RagIngestJobData {
   institutionId: string;
   /** 과목 ID (선택) */
   courseId?: string;
+  category?: string;
+  tags?: string[];
+  /** RAG 임베딩 수행 여부 (기본 true) */
+  enableRag?: boolean;
+  /** 임베딩 프로바이더 */
+  embeddingProvider?: 'openai' | 'cohere' | 'google';
+  /** 프로바이더 API 키 (키 저장소에서 해석 후 전달) */
+  embeddingApiKey?: string;
   /** 원본 파일명 (확장자 판별 및 DB 저장용) */
   fileName: string;
   /**

@@ -12,7 +12,7 @@
  *
  * 알려진 settingKey 목록:
  *   'portfolio'   — PortfolioSettings JSON (criticalThreshold 등)
- *   'secrets'     — { openaiApiKey?, anthropicApiKey?, slackWebhookUrl? }
+ *   'secrets'     — { openaiApiKey?, anthropicApiKey?, openclawApiKey?, slackWebhookUrl? }
  *
  * ⚠️  Phase 5-5 보안 감사 항목:
  *   secrets 값은 현재 plaintext로 저장됩니다.

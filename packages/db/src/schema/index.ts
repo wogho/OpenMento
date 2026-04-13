@@ -25,3 +25,12 @@ export * from './goals.js';
 export * from './budget_policies.js'; // budgetPolicies, costEvents, modelPricing 포함
 export * from './onboarding_completions.js';
 export * from './admin_users.js';
+export * from './student_skills.js';
+export * from './student_agent_preferences.js';
+export * from './student_courses.js';
+export * from './assignments.js';
+export * from './assignment_comments.js';
+export * from './instructor_notifications.js';
+export * from './instructor_chat_messages.js';
+export * from './portfolio_posts.js';
+export * from './agent_messages.js';

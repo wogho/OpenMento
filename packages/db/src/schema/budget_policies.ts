@@ -48,6 +48,8 @@ export const costEvents = pgTable('cost_events', {
     .references(() => institutions.id, { onDelete: 'cascade' }),
   agentId: uuid('agent_id')
     .references(() => agents.id, { onDelete: 'set null' }),
+  // 비용 추적 단위: 에이전트, 교과목, 또는 특정 태그(RAG 교재 등) 매핑 지원
+  categoryTag: text('category_tag'),
   provider: text('provider').notNull(), // 'openai', 'anthropic', 'google'
   model: text('model').notNull(),
   promptTokens: integer('prompt_tokens').notNull(),

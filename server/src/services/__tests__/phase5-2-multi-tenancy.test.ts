@@ -100,18 +100,19 @@ function makeRes() {
 // ── ① UserRole 타입 검증 ────────────────────────────────────────────────────
 
 describe('[T] UserRole & JwtPayload 타입', () => {
-  it('T①  USER_ROLES에 super_admin이 포함됩니다', () => {
-    expect(USER_ROLES).toContain('super_admin');
+  it('T①  USER_ROLES에 teacher와 admin이 포함됩니다', () => {
+    expect(USER_ROLES).toContain('teacher');
+    expect(USER_ROLES).toContain('admin');
   });
 
   it('T②  JwtPayload 타입에 institutionId 필드가 있습니다 (컴파일 타임 확인)', () => {
     const payload: JwtPayload = {
       sub: '00000000-0000-0000-0000-000000000001',
-      role: 'super_admin',
-      institutionId: 'super',
+      role: 'admin',
+      institutionId: 'inst-001',
     };
-    expect(payload.institutionId).toBe('super');
-    expect(payload.role).toBe('super_admin');
+    expect(payload.institutionId).toBe('inst-001');
+    expect(payload.role).toBe('admin');
   });
 
   it('T③  requireRole(admin): admin 역할 통과', () => {
@@ -132,19 +133,19 @@ describe('[T] UserRole & JwtPayload 타입', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('T⑤  requireRole(super_admin): super_admin 역할 통과', () => {
-    const req = makeReq({ user: { role: 'super_admin', sub: 'u1', institutionId: 'super' } });
+  it('T⑤  requireRole(teacher): teacher 역할 통과', () => {
+    const req = makeReq({ user: { role: 'teacher', sub: 'u1', institutionId: 'inst1' } });
     const res = makeRes();
     const next = vi.fn();
-    requireRole('super_admin')(req, res, next);
+    requireRole('teacher')(req, res, next);
     expect(next).toHaveBeenCalled();
   });
 
-  it('T⑥  requireRole(super_admin): admin 역할 403 차단 (super_admin과 다름)', () => {
-    const req = makeReq({ user: { role: 'admin', sub: 'u1', institutionId: 'inst1' } });
+  it('T⑥  requireRole(teacher): student 역할 403 차단', () => {
+    const req = makeReq({ user: { role: 'student', sub: 'u1', institutionId: 'inst1' } });
     const res = makeRes();
     const next = vi.fn();
-    requireRole('super_admin')(req, res, next);
+    requireRole('teacher')(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
@@ -167,9 +168,9 @@ describe('[R] requireSameInstitution 미들웨어', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('R②  super_admin은 다른 기관 institutionId 파라미터로도 접근 가능', () => {
+  it('R②  admin은 다른 기관 institutionId 파라미터로도 접근 가능 (R② 영역 확인)', () => {
     const req = makeReq({
-      user: { role: 'super_admin', sub: 'u1', institutionId: 'super' },
+      user: { role: 'admin', sub: 'u1', institutionId: INST_A },
       params: { institutionId: INST_B },
     });
     const res = makeRes();

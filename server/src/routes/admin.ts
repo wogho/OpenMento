@@ -1,12 +1,14 @@
-import { Router } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import os from 'node:os';
+import { mkdirSync } from 'node:fs';
 import { extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/rbac.js';
-import { ingestDocument } from '@openmento/rag';
+import { ingestDocument, type EmbeddingProvider } from '@openmento/rag';
 import { getRagIngestQueue } from '../queues/rag-ingest.queue.js';
 import {
   db,
@@ -18,6 +20,7 @@ import {
   conversationMessages,
   auditLogs,
   students,
+  adminUsers,
   routines,
   routineTriggers,
   costEvents,
@@ -25,7 +28,11 @@ import {
   modelPricing,
   attendanceLogs,
   instructorSkills,
+  studentSkills,
+  studentCourses,
   agents,
+  assignments,
+  assignmentComments,
   eq,
   and,
   isNull,
@@ -33,7 +40,11 @@ import {
   desc,
   gte,
   lte,
-
+  count,
+  courses,
+  assignmentSubmissions,
+  inArray,
+  isNotNull,
 } from '@openmento/db';
 import { invalidateSkillCache, importSkillFromGitHub } from '../services/skill-injector.js';
 import { hasCyclicParent } from '../services/agent-hierarchy.js';
@@ -43,17 +54,22 @@ import { invalidatePricingCache } from '../services/budget-guard.js';
 import { getEwsThresholds, setEwsThresholds } from '../services/ews-thresholds.js';
 import { getPortfolioSettings, setPortfolioSettings } from '../services/portfolio-settings-store.js';
 import { getInstitutionSetting, setInstitutionSetting } from '../services/institution-settings-service.js';
-import { triggerAgentManually, getHeartbeatStatus } from '../services/heartbeat.js';
+import {
+  triggerAgentManually,
+  getHeartbeatStatus,
+  cancelHeartbeatRun,
+  applyHeartbeatCallback,
+  getAgentSession,
+  clearAgentSession,
+} from '../services/heartbeat.js';
+import { verifyAgentToken } from '../services/agent-auth-jwt.js';
+import { runHeartbeatProactiveScan, sendHeartbeatMessage } from '../services/heartbeat-proactive.js';
 import { sendSlackTestMessage } from '../services/slack-notifier.js';
 import { slackTestLimiter } from '../middleware/rateLimiter.js';
 import systemRouter from './system.js';
 import securityRouter from './security.js';
 
 const router: ReturnType<typeof Router> = Router();
-
-// 모든 /admin/* 라우트에 인증 + admin 역할 전용 검증 적용
-router.use(authenticate);
-router.use(requireRole('admin'));
 
 // ─── 보안 키 저장소 (DB Write-Through 캐시) ────────────────────────────────────
 // institution-settings-service를 통해 institution_settings 테이블에 영속화
@@ -63,6 +79,12 @@ const SECRETS_KEY = 'secrets';
 interface AdminSecrets {
   openaiApiKey?: string;
   anthropicApiKey?: string;
+  openclawApiKey?: string;
+  geminiApiKey?: string;
+  ragOpenaiApiKey?: string;
+  ragCohereApiKey?: string;
+  ragGoogleApiKey?: string;
+  ragEmbeddingDefaultProvider?: EmbeddingProvider;
   slackWebhookUrl?: string;
 }
 async function getSecrets(institutionId: string): Promise<AdminSecrets> {
@@ -72,11 +94,133 @@ async function setSecrets(institutionId: string, secrets: AdminSecrets): Promise
   return setInstitutionSetting<AdminSecrets>(institutionId, SECRETS_KEY, secrets);
 }
 
+function interpolateSecretRefs(value: string, secrets: AdminSecrets): string {
+  return value.replace(/\$\{\s*secrets\.([a-zA-Z0-9_]+)\s*\}/g, (_, key: string) => {
+    const resolved = secrets[key as keyof AdminSecrets];
+    return typeof resolved === 'string' ? resolved : '';
+  });
+}
+
+const RAG_EMBEDDING_PROVIDERS = ['openai', 'cohere', 'google'] as const;
+
+function resolveRagEmbeddingApiKey(
+  secrets: AdminSecrets,
+  provider: EmbeddingProvider,
+): string | undefined {
+  switch (provider) {
+    case 'openai':
+      return secrets.ragOpenaiApiKey ?? secrets.openaiApiKey ?? process.env.OPENAI_API_KEY;
+    case 'cohere':
+      return secrets.ragCohereApiKey ?? process.env.COHERE_API_KEY;
+    case 'google':
+      return (
+        secrets.ragGoogleApiKey
+        ?? secrets.geminiApiKey
+        ?? process.env.GOOGLE_API_KEY
+        ?? process.env.GEMINI_API_KEY
+      );
+    default:
+      return undefined;
+  }
+}
+
+function buildAvailableRagProviders(secrets: AdminSecrets): EmbeddingProvider[] {
+  return RAG_EMBEDDING_PROVIDERS.filter((provider) =>
+    Boolean(resolveRagEmbeddingApiKey(secrets, provider)),
+  );
+}
+
+// ── Heartbeat 콜백 (외부 webhook 어댑터 전용) ──────────────────────────────────
+// 주의: 이 라우트는 admin role이 아닌 agent heartbeat 토큰으로 접근 가능해야 하므로
+// requireRole('admin') 적용 전에 배치합니다.
+const heartbeatCallbackParamSchema = z.object({ runId: z.string().uuid() });
+const heartbeatCallbackBodySchema = z.object({
+  success: z.boolean().optional(),
+  status: z.enum(['completed', 'failed']).optional(),
+  resultJson: z.record(z.unknown()).optional(),
+  usageJson: z.record(z.unknown()).optional(),
+  stdoutExcerpt: z.string().optional(),
+  errorMessage: z.string().optional(),
+  costUsd: z.number().nonnegative().optional(),
+  model: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional(),
+  cachedInputTokens: z.number().int().nonnegative().optional(),
+  errorCode: z.string().min(1).optional(),
+  // paperclip Session Codec 호환: 세션 컨텍스트 저장/복원 필드
+  sessionParams: z.record(z.unknown()).nullable().optional(),
+  sessionId: z.string().nullable().optional(),
+  clearSession: z.boolean().optional(),
+});
+
+router.post('/heartbeat/runs/:runId/callback', async (req, res) => {
+  const parsedParams = heartbeatCallbackParamSchema.safeParse(req.params);
+  if (!parsedParams.success) {
+    res.status(400).json({ error: '유효하지 않은 runId 형식입니다.' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authorization 헤더가 필요합니다.' });
+    return;
+  }
+
+  const token = authHeader.slice(7);
+
+  let institutionId: string;
+  let tokenRunId: string;
+  try {
+    const decoded = verifyAgentToken(token);
+    institutionId = decoded.institutionId;
+    tokenRunId = decoded.runId;
+  } catch {
+    res.status(401).json({ error: '유효하지 않은 agent heartbeat 토큰입니다.' });
+    return;
+  }
+
+  if (tokenRunId !== parsedParams.data.runId) {
+    res.status(403).json({ error: '토큰 runId와 요청 runId가 일치하지 않습니다.' });
+    return;
+  }
+
+  const parsedBody = heartbeatCallbackBodySchema.safeParse(req.body);
+  if (!parsedBody.success) {
+    res.status(400).json({ error: parsedBody.error.flatten() });
+    return;
+  }
+
+  const outcome = await applyHeartbeatCallback(
+    parsedParams.data.runId,
+    institutionId,
+    parsedBody.data,
+  );
+
+  if (outcome === 'not_found') {
+    res.status(404).json({ error: 'run을 찾을 수 없습니다.' });
+    return;
+  }
+
+  if (outcome === 'already_finished') {
+    res.status(409).json({ error: '이미 종료된 run 입니다.' });
+    return;
+  }
+
+  res.json({ message: 'callback이 반영되었습니다.', runId: parsedParams.data.runId });
+});
+
+// 모든 /admin/* 라우트에 인증 + admin/teacher 역할 검증 적용
+router.use(authenticate);
+router.use(requireRole('admin', 'teacher'));
+
 // multer: 공유 볼륨 또는 OS tmpdir 디스크 스토리지
 // - UPLOAD_TMP_DIR env: Docker 공유 볼륨 경로(rag-worker와 공유)
 // - 미설정 시: os.tmpdir() — 로컬 개발 / REDIS_URL 없는 환경
 // worker_threads 기반 ingestDocument()가 파일 경로를 요구함 (memoryStorage() 사용 불가)
 const UPLOAD_TMP_DIR = process.env.UPLOAD_TMP_DIR ?? os.tmpdir();
+mkdirSync(UPLOAD_TMP_DIR, { recursive: true });
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOAD_TMP_DIR),
@@ -97,9 +241,345 @@ const upload = multer({
   },
 });
 
+const singleDocumentUpload = (req: Request, res: Response, next: NextFunction) => {
+  upload.single('file')(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: '파일 용량이 50MB를 초과합니다.' });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
+
+    const message = err instanceof Error ? err.message : '파일 업로드 중 오류가 발생했습니다.';
+    res.status(400).json({ error: message });
+  });
+};
+
 // institutionId는 JWT에서 추출 (DocumentManager UI가 전송하지 않음)
 const documentUploadSchema = z.object({
+  category: z.string().optional(),
   courseId: z.string().uuid().optional(),
+  tags: z.preprocess((arg) => {
+    if (typeof arg !== 'string') return arg;
+    try {
+      return JSON.parse(arg);
+    } catch {
+      return undefined;
+    }
+  }, z.array(z.string()).optional()),
+  enableRag: z.preprocess((arg) => {
+    if (typeof arg === 'boolean') return arg;
+    if (typeof arg === 'string') return arg.toLowerCase() === 'true';
+    return undefined;
+  }, z.boolean().optional()),
+  embeddingProvider: z.enum(RAG_EMBEDDING_PROVIDERS).optional(),
+});
+
+
+// ============================================
+// 강사/관리자 담당 과목 (Course Dashboard)
+// ============================================
+const courseSchema = z.object({
+  name: z.string().min(1),
+  subject: z.string().min(1),
+  instructorId: z.string().uuid().optional(),
+});
+
+const courseUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  subject: z.string().min(1).optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get('/courses', async (req, res) => {
+  const { institutionId, role, sub: id } = req.user!;
+  
+  // 강사일 경우 자신이 담당(instructorId)인 것만, 혹은 기관 전체 조회
+  const conditions = [
+    eq(courses.institutionId, institutionId),
+    isNull(courses.deletedAt),
+  ];
+  if (role === 'teacher') {
+    conditions.push(eq(courses.instructorId, id));
+  }
+  
+  const list = await db
+    .select()
+    .from(courses)
+    .where(and(...conditions))
+    .orderBy(desc(courses.createdAt));
+    
+  res.json({ courses: list });
+});
+
+router.post('/courses', async (req, res, next) => {
+  try {
+    const parsed = courseSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error });
+    
+    const { institutionId, role, sub: id } = req.user!;
+    const [created] = await db.insert(courses).values({
+      institutionId,
+      name: parsed.data.name,
+      subject: parsed.data.subject,
+      instructorId: role === 'teacher' ? id : (parsed.data.instructorId || null),
+    }).returning();
+    res.status(201).json({ course: created });
+  } catch (error) {
+    console.error('[Course Create Error]', error);
+    next(error);
+  }
+});
+
+// PUT /admin/courses/:courseId — 과목 수정 (이름, 분야, 활성 여부)
+router.put('/courses/:courseId', async (req, res) => {
+  const { institutionId, role, sub: userId } = req.user!;
+  const { courseId } = req.params;
+  const parsed = courseUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '요청값이 올바르지 않습니다.', details: parsed.error.flatten() });
+    return;
+  }
+
+  const conditions = [
+    eq(courses.id, courseId),
+    eq(courses.institutionId, institutionId),
+    isNull(courses.deletedAt),
+  ];
+  if (role === 'teacher') conditions.push(eq(courses.instructorId, userId));
+
+  const [existing] = await db.select({ id: courses.id }).from(courses).where(and(...conditions)).limit(1);
+  if (!existing) { res.status(404).json({ error: '과목을 찾을 수 없습니다.' }); return; }
+
+  const [updated] = await db
+    .update(courses)
+    .set({ ...parsed.data, updatedAt: new Date() })
+    .where(eq(courses.id, courseId))
+    .returning();
+
+  res.json({ course: updated });
+});
+
+// DELETE /admin/courses/:courseId — 과목 소프트 삭제
+router.delete('/courses/:courseId', async (req, res) => {
+  const { institutionId, role, sub: userId } = req.user!;
+  const { courseId } = req.params;
+
+  const conditions = [
+    eq(courses.id, courseId),
+    eq(courses.institutionId, institutionId),
+    isNull(courses.deletedAt),
+  ];
+  if (role === 'teacher') conditions.push(eq(courses.instructorId, userId));
+
+  const [existing] = await db.select({ id: courses.id }).from(courses).where(and(...conditions)).limit(1);
+  if (!existing) { res.status(404).json({ error: '과목을 찾을 수 없습니다.' }); return; }
+
+  await db.update(courses).set({ deletedAt: new Date() }).where(eq(courses.id, courseId));
+  res.status(204).end();
+});
+
+// ── 과목(Course) 하위 현황 API ─────────────────────────────────────────────
+
+// GET /admin/courses/:courseId/summary — 과목 상세 현황 요약
+router.get('/courses/:courseId/summary', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+
+  // 과목 소유권 확인
+  const [course] = await db.select().from(courses).where(
+    and(eq(courses.id, courseId), eq(courses.institutionId, institutionId), isNull(courses.deletedAt))
+  );
+  if (!course) return res.status(404).json({ error: '과목을 찾을 수 없습니다.' });
+
+  const [skillsCount] = await db.select({ cnt: count() }).from(instructorSkills).where(
+    and(eq(instructorSkills.courseId, courseId), isNull(instructorSkills.deletedAt))
+  );
+  const [docsCount] = await db.select({ cnt: sql<number>`COUNT(DISTINCT ${ragDocuments.sourceFileName})` }).from(ragDocuments).where(
+    and(eq(ragDocuments.courseId, courseId), isNull(ragDocuments.deletedAt))
+  );
+  const [studentsCount] = await db.select({ cnt: count() }).from(studentCourses).where(
+    and(eq(studentCourses.courseId, courseId), isNull(studentCourses.deletedAt))
+  );
+  const [assignmentsCount] = await db.select({ cnt: count() }).from(assignments).where(
+    and(eq(assignments.courseId, courseId), isNull(assignments.deletedAt))
+  );
+
+  res.json({
+    course,
+    stats: {
+      skills: Number(skillsCount?.cnt ?? 0),
+      documents: Number(docsCount?.cnt ?? 0),
+      students: Number(studentsCount?.cnt ?? 0),
+      assignments: Number(assignmentsCount?.cnt ?? 0),
+    },
+  });
+});
+
+// GET /admin/courses/:courseId/students — 과목 수강생 목록 (M2M)
+router.get('/courses/:courseId/students', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+  const list = await db.select({
+    id: students.id,
+    email: students.email,
+    displayName: students.displayName,
+    enrolledAt: studentCourses.enrolledAt,
+  }).from(studentCourses)
+    .innerJoin(students, eq(studentCourses.studentId, students.id))
+    .where(
+      and(
+        eq(studentCourses.courseId, courseId),
+        eq(students.institutionId, institutionId),
+        isNull(studentCourses.deletedAt),
+        isNull(students.deletedAt),
+      )
+    ).orderBy(desc(studentCourses.enrolledAt));
+  res.json({ students: list });
+});
+
+// GET /admin/courses/:courseId/skills — 과목에 연결된 스킬 목록
+router.get('/courses/:courseId/skills', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+  const list = await db.select({
+    id: instructorSkills.id,
+    title: instructorSkills.title,
+    tags: instructorSkills.tags,
+    createdAt: instructorSkills.createdAt,
+  }).from(instructorSkills).where(
+    and(eq(instructorSkills.courseId, courseId), eq(instructorSkills.institutionId, institutionId), isNull(instructorSkills.deletedAt))
+  ).orderBy(desc(instructorSkills.createdAt));
+  res.json({ skills: list });
+});
+
+// GET /admin/courses/:courseId/documents — 과목 교재 목록
+router.get('/courses/:courseId/documents', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+  const list = await db.select({
+    id: sql<string>`MIN(${ragDocuments.id}::text)`,
+    filename: ragDocuments.sourceFileName,
+    category: sql<string>`MAX(${ragDocuments.category})`,
+    tags: sql<string>`MAX(${ragDocuments.tags}::text)`,
+    createdAt: sql<string>`MIN(${ragDocuments.createdAt})`,
+  }).from(ragDocuments).where(
+    and(eq(ragDocuments.courseId, courseId), eq(ragDocuments.institutionId, institutionId), isNull(ragDocuments.deletedAt))
+  ).groupBy(ragDocuments.sourceFileName);
+  res.json({ documents: list });
+});
+
+// GET /admin/courses/:courseId/assignments — 과목 과제 목록 (제목 단위 집계)
+router.get('/courses/:courseId/assignments', async (req, res) => {
+  const { courseId } = req.params;
+  const list = await db.select({
+    assignmentTitle: assignmentSubmissions.assignmentTitle,
+    total: count(),
+    dueAt: sql<string>`MAX(${assignmentSubmissions.dueAt})`,
+  }).from(assignmentSubmissions).where(
+    and(eq(assignmentSubmissions.courseId, courseId), isNull(assignmentSubmissions.deletedAt))
+  ).groupBy(assignmentSubmissions.assignmentTitle);
+  res.json({ assignments: list });
+});
+
+// POST /admin/courses/:courseId/assignments — 새 과제 등록 (전체 수강생에게)
+router.post('/courses/:courseId/assignments', async (req, res) => {
+  const { courseId } = req.params;
+  const { title, dueAt } = req.body as { title?: string; dueAt?: string };
+  if (!title) return res.status(400).json({ error: 'title 필수입니다.' });
+
+  // 해당 과목 수강생 목록 조회 (M2M)
+  const courseStudents = await db.select({ id: students.id })
+    .from(studentCourses)
+    .innerJoin(students, eq(studentCourses.studentId, students.id))
+    .where(and(eq(studentCourses.courseId, courseId), isNull(studentCourses.deletedAt), isNull(students.deletedAt)));
+  if (courseStudents.length === 0) return res.status(400).json({ error: '해당 과목에 수강생이 없습니다.' });
+
+  const rows = courseStudents.map(s => ({
+    studentId: s.id,
+    courseId,
+    assignmentTitle: title,
+    status: 'missing' as const,
+    dueAt: dueAt ? new Date(dueAt) : null,
+  }));
+  await db.insert(assignmentSubmissions).values(rows);
+  res.status(201).json({ created: rows.length });
+});
+
+// POST /admin/courses/:courseId/skills/link — 기존 스킬을 과목에 연결
+router.post('/courses/:courseId/skills/link', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+  const { skillId } = req.body as { skillId?: string };
+  if (!skillId) { res.status(400).json({ error: 'skillId 필수' }); return; }
+
+  const [skill] = await db.select({ id: instructorSkills.id })
+    .from(instructorSkills)
+    .where(and(eq(instructorSkills.id, skillId), eq(instructorSkills.institutionId, institutionId), isNull(instructorSkills.deletedAt)))
+    .limit(1);
+  if (!skill) { res.status(404).json({ error: '스킬을 찾을 수 없습니다.' }); return; }
+
+  await db.update(instructorSkills).set({ courseId, updatedAt: new Date() }).where(eq(instructorSkills.id, skillId));
+  res.json({ success: true });
+});
+
+// POST /admin/courses/:courseId/documents/link — 기존 교재를 과목에 연결 (파일명 기준 일괄)
+router.post('/courses/:courseId/documents/link', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+  const { sourceFileName } = req.body as { sourceFileName?: string };
+  if (!sourceFileName) { res.status(400).json({ error: 'sourceFileName 필수' }); return; }
+
+  await db.update(ragDocuments).set({ courseId })
+    .where(and(eq(ragDocuments.sourceFileName, sourceFileName), eq(ragDocuments.institutionId, institutionId)));
+  res.json({ success: true });
+});
+
+// POST /admin/courses/:courseId/students/link — 수강생을 과목에 배정 (M2M upsert)
+router.post('/courses/:courseId/students/link', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId } = req.params;
+  const { studentId } = req.body as { studentId?: string };
+  if (!studentId) { res.status(400).json({ error: 'studentId 필수' }); return; }
+
+  const [student] = await db.select({ id: students.id })
+    .from(students)
+    .where(and(eq(students.id, studentId), eq(students.institutionId, institutionId), isNull(students.deletedAt)))
+    .limit(1);
+  if (!student) { res.status(404).json({ error: '수강생을 찾을 수 없습니다.' }); return; }
+
+  // M2M upsert — 이미 연결돼 있으면 deletedAt 초기화(복구)
+  await db.insert(studentCourses)
+    .values({ studentId, courseId })
+    .onConflictDoUpdate({
+      target: [studentCourses.studentId, studentCourses.courseId],
+      set: { deletedAt: null, isActive: true },
+    });
+  res.json({ success: true });
+});
+
+// DELETE /admin/courses/:courseId/students/:studentId/unlink — 수강생을 과목에서 제거
+router.delete('/courses/:courseId/students/:studentId/unlink', async (req, res) => {
+  const { institutionId } = req.user!;
+  const { courseId, studentId } = req.params;
+
+  const [student] = await db.select({ id: students.id })
+    .from(students)
+    .where(and(eq(students.id, studentId), eq(students.institutionId, institutionId), isNull(students.deletedAt)))
+    .limit(1);
+  if (!student) { res.status(404).json({ error: '수강생을 찾을 수 없습니다.' }); return; }
+
+  await db.update(studentCourses)
+    .set({ deletedAt: new Date(), isActive: false })
+    .where(and(eq(studentCourses.studentId, studentId), eq(studentCourses.courseId, courseId), isNull(studentCourses.deletedAt)));
+  res.json({ success: true });
 });
 
 // GET /admin/health — 관리자용 상세 헬스체크
@@ -121,6 +601,8 @@ router.get('/documents', async (req, res) => {
     .select({
       id: sql<string>`MIN(${ragDocuments.id}::text)`,
       filename: ragDocuments.sourceFileName,
+      category: sql<string>`MAX(${ragDocuments.category})`,
+      tags: sql<string>`MAX(${ragDocuments.tags}::text)`,
       createdAt: sql<string>`MIN(${ragDocuments.createdAt})`,
     })
     .from(ragDocuments)
@@ -136,11 +618,34 @@ router.get('/documents', async (req, res) => {
     docs.map((d) => ({
       id: d.id,
       filename: d.filename,
+      category: d.category,
+      tags: d.tags ? JSON.parse(d.tags) : [],
       createdAt: d.createdAt
         ? new Date(d.createdAt).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
     })),
   );
+});
+
+// GET /admin/rag/providers — 키 저장소 기준 사용 가능한 RAG 임베딩 프로바이더 조회
+router.get('/rag/providers', async (req, res) => {
+  const institutionId = req.user?.institutionId ?? 'default';
+  const secrets = await getSecrets(institutionId);
+  const availableProviders = buildAvailableRagProviders(secrets);
+  const fallbackProvider: EmbeddingProvider = 'openai';
+  const requestedDefault = secrets.ragEmbeddingDefaultProvider;
+  const defaultProvider =
+    requestedDefault && availableProviders.includes(requestedDefault)
+      ? requestedDefault
+      : (availableProviders[0] ?? fallbackProvider);
+
+  res.json({
+    defaultProvider,
+    providers: RAG_EMBEDDING_PROVIDERS.map((provider) => ({
+      id: provider,
+      available: availableProviders.includes(provider),
+    })),
+  });
 });
 
 // POST /admin/documents — 교재 업로드 및 RAG 임베딩 등록
@@ -150,7 +655,8 @@ router.get('/documents', async (req, res) => {
 //   REDIS_URL 있음 → BullMQ 큐에 Job 추가 → 202 Accepted (즉시 응답)
 //                    rag-worker 프로세스가 백그라운드에서 파싱+임베딩+DB 저장 수행
 //   REDIS_URL 없음 → 기존 직접 ingestDocument() 호출 → 201 Created (처리 완료 후 응답)
-router.post('/documents', upload.single('file'), async (req, res) => {
+
+router.post('/documents', singleDocumentUpload, async (req, res) => {
   const { institutionId } = req.user!;
 
   if (!req.file) {
@@ -158,37 +664,88 @@ router.post('/documents', upload.single('file'), async (req, res) => {
     return;
   }
 
-  const parsed = documentUploadSchema.safeParse(req.body);
-  const courseId = parsed.success ? parsed.data.courseId : undefined;
-  const deliveryId = randomUUID();
+  try {
+    const parsed = documentUploadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: '교재 업로드 요청 형식이 올바르지 않습니다.',
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
 
-  const ragQueue = getRagIngestQueue();
+    const courseId = parsed.data.courseId;
+    const category = parsed.data.category;
+    const tags = parsed.data.tags ?? [];
+    const enableRag = parsed.data.enableRag ?? true;
+    const requestedProvider = parsed.data.embeddingProvider;
+    const secrets = await getSecrets(institutionId);
 
-  if (ragQueue) {
-    // ── BullMQ 비동기 경로 (REDIS_URL 있을 때) ────────────────────────────
-    // rag-worker 컨테이너가 동일한 공유 볼륨(UPLOAD_TMP_DIR)을 마운트하고 있어야 합니다.
-    await ragQueue.add(
-      'ingest',
-      {
-        institutionId,
-        courseId,
-        fileName: req.file.originalname,
-        filePath: req.file.path, // 공유 볼륨 경로
-        deliveryId,
-      },
-      { jobId: deliveryId },
-    );
-    res.status(202).json({
-      status: 'queued',
-      jobId: deliveryId,
-      filename: req.file.originalname,
-      message: '임베딩 처리가 백그라운드에서 진행됩니다. 완료 후 문서 목록에 표시됩니다.',
-    });
-  } else {
+    let embeddingProvider: EmbeddingProvider | undefined;
+    let embeddingApiKey: string | undefined;
+
+    if (enableRag) {
+      const configuredDefault = secrets.ragEmbeddingDefaultProvider;
+      embeddingProvider = requestedProvider ?? configuredDefault ?? 'openai';
+      embeddingApiKey = resolveRagEmbeddingApiKey(secrets, embeddingProvider);
+
+      if (!embeddingApiKey) {
+        res.status(400).json({
+          error: `선택한 RAG 임베딩 프로바이더(${embeddingProvider})의 API 키가 설정되지 않았습니다. 시스템 외부 연동 Key 저장소에서 RAG 전용 키를 먼저 등록해 주세요.`,
+        });
+        return;
+      }
+    }
+
+    const finalTags = Array.from(new Set(
+      enableRag && embeddingProvider
+        ? [...tags, `rag_provider:${embeddingProvider}`]
+        : tags,
+    ));
+
+    const deliveryId = randomUUID();
+
+    const ragQueue = getRagIngestQueue();
+
+    if (ragQueue) {
+      // ── BullMQ 비동기 경로 (REDIS_URL 있을 때) ────────────────────────────
+      // rag-worker 컨테이너가 동일한 공유 볼륨(UPLOAD_TMP_DIR)을 마운트하고 있어야 합니다.
+      await ragQueue.add(
+        'ingest',
+        {
+          institutionId,
+          courseId,
+          category,
+          tags: finalTags,
+          enableRag,
+          embeddingProvider,
+          embeddingApiKey,
+          fileName: req.file.originalname,
+          filePath: req.file.path, // 공유 볼륨 경로
+          deliveryId,
+        },
+        { jobId: deliveryId },
+      );
+      res.status(202).json({
+        status: 'queued',
+        jobId: deliveryId,
+        filename: req.file.originalname,
+        message: enableRag
+          ? '임베딩 처리가 백그라운드에서 진행됩니다. 완료 후 문서 목록에 표시됩니다.'
+          : '문서 처리가 백그라운드에서 진행됩니다. 완료 후 문서 목록에 표시됩니다.',
+      });
+      return;
+    }
+
     // ── 직접 호출 fallback (REDIS_URL 없을 때) ────────────────────────────
     await ingestDocument({
       institutionId,
       courseId,
+      category,
+      tags: finalTags,
+      enableRag,
+      embeddingProvider,
+      embeddingApiKey,
       fileName: req.file.originalname,
       filePath: req.file.path,
     });
@@ -197,6 +754,10 @@ router.post('/documents', upload.single('file'), async (req, res) => {
       filename: req.file.originalname,
       createdAt: new Date().toISOString().split('T')[0],
     });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '문서 업로드 중 오류가 발생했습니다.';
+    console.error('문서 업로드 실패', err);
+    res.status(500).json({ error: message });
   }
 });
 
@@ -247,14 +808,34 @@ router.get('/secrets', async (req, res) => {
   res.json({
     openaiApiKey: mask(secrets.openaiApiKey),
     anthropicApiKey: mask(secrets.anthropicApiKey),
+    openclawApiKey: mask(secrets.openclawApiKey),
+    geminiApiKey: mask(secrets.geminiApiKey),
+    ragOpenaiApiKey: mask(secrets.ragOpenaiApiKey),
+    ragCohereApiKey: mask(secrets.ragCohereApiKey),
+    ragGoogleApiKey: mask(secrets.ragGoogleApiKey),
+    ragEmbeddingDefaultProvider: secrets.ragEmbeddingDefaultProvider ?? 'openai',
     slackWebhookUrl: secrets.slackWebhookUrl ?? '',
   });
 });
 
 // PUT /admin/secrets — 보안 키 저장 (DB Write-Through + process.env 즉시 반영)
+
+/** 마스킹 문자(•)가 포함된 문자열을 거부하는 Zod 검증 (안전장치)
+ *  GET /admin/secrets 의 마스킹값이 그대로 저장되는 버그를 서버 레이어에서 차단 */
+const noMaskChar = (fieldName: string) =>
+  z.string().refine((v) => !v.includes('\u2022'), {
+    message: `${fieldName}: 마스킹된 값(•)은 저장할 수 없습니다. 실제 키를 입력하세요.`,
+  });
+
 const secretsSchema = z.object({
-  openaiApiKey: z.string().optional(),
-  anthropicApiKey: z.string().optional(),
+  openaiApiKey: noMaskChar('openaiApiKey').optional(),
+  anthropicApiKey: noMaskChar('anthropicApiKey').optional(),
+  openclawApiKey: noMaskChar('openclawApiKey').optional(),
+  geminiApiKey: noMaskChar('geminiApiKey').optional(),
+  ragOpenaiApiKey: noMaskChar('ragOpenaiApiKey').optional(),
+  ragCohereApiKey: noMaskChar('ragCohereApiKey').optional(),
+  ragGoogleApiKey: noMaskChar('ragGoogleApiKey').optional(),
+  ragEmbeddingDefaultProvider: z.enum(RAG_EMBEDDING_PROVIDERS).optional(),
   slackWebhookUrl: z.union([z.string().url(), z.literal('')]).optional(),
 });
 
@@ -269,7 +850,17 @@ router.put('/secrets', async (req, res) => {
   }
 
   const institutionId = req.user?.institutionId ?? 'default';
-  const { openaiApiKey, anthropicApiKey, slackWebhookUrl } = parsed.data;
+  const {
+    openaiApiKey,
+    anthropicApiKey,
+    openclawApiKey,
+    geminiApiKey,
+    ragOpenaiApiKey,
+    ragCohereApiKey,
+    ragGoogleApiKey,
+    ragEmbeddingDefaultProvider,
+    slackWebhookUrl,
+  } = parsed.data;
 
   const existing = await getSecrets(institutionId);
   const updated: AdminSecrets = { ...existing };
@@ -281,6 +872,31 @@ router.put('/secrets', async (req, res) => {
   if (anthropicApiKey) {
     updated.anthropicApiKey = anthropicApiKey;
     process.env.ANTHROPIC_API_KEY = anthropicApiKey;
+  }
+  if (openclawApiKey) {
+    updated.openclawApiKey = openclawApiKey;
+    process.env.OPENCLAW_API_KEY = openclawApiKey;
+  }
+  if (geminiApiKey) {
+    updated.geminiApiKey = geminiApiKey;
+    process.env.GEMINI_API_KEY = geminiApiKey;
+    process.env.GOOGLE_API_KEY = geminiApiKey;       // Paperclip gemini-local 호환
+    process.env.GOOGLE_AI_API_KEY = geminiApiKey;    // Google SDK (GoogleGenerativeAI) 호환
+  }
+  if (ragOpenaiApiKey) {
+    updated.ragOpenaiApiKey = ragOpenaiApiKey;
+    process.env.RAG_OPENAI_API_KEY = ragOpenaiApiKey;
+  }
+  if (ragCohereApiKey) {
+    updated.ragCohereApiKey = ragCohereApiKey;
+    process.env.RAG_COHERE_API_KEY = ragCohereApiKey;
+  }
+  if (ragGoogleApiKey) {
+    updated.ragGoogleApiKey = ragGoogleApiKey;
+    process.env.RAG_GOOGLE_API_KEY = ragGoogleApiKey;
+  }
+  if (ragEmbeddingDefaultProvider) {
+    updated.ragEmbeddingDefaultProvider = ragEmbeddingDefaultProvider;
   }
   if (slackWebhookUrl !== undefined) {
     updated.slackWebhookUrl = slackWebhookUrl;
@@ -335,6 +951,96 @@ router.post('/heartbeat/trigger/:agentId', async (req, res) => {
   res.status(202).json({ message: '에이전트 실행이 예약되었습니다.', ...result });
 });
 
+// POST /admin/heartbeat/runs/:runId/cancel — 실행 중인 run 취소 (paperclip cancelRun 참조)
+const cancelRunSchema = z.object({ runId: z.string().uuid() });
+
+router.post('/heartbeat/runs/:runId/cancel', async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = cancelRunSchema.safeParse(req.params);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: '유효하지 않은 runId 형식입니다.' });
+    return;
+  }
+
+  const outcome = await cancelHeartbeatRun(parsed.data.runId, institutionId);
+
+  if (outcome === 'not_found') {
+    res.status(404).json({ error: 'run을 찾을 수 없습니다.' });
+    return;
+  }
+  if (outcome === 'not_running') {
+    res.status(409).json({ error: '실행 중인 run이 아닙니다.' });
+    return;
+  }
+
+  res.json({ message: 'run 취소 요청이 처리되었습니다.', runId: parsed.data.runId });
+});
+
+// POST /admin/heartbeat/proactive/test — 프로액티브 heartbeat 강제 즉시 실행 (30분 활동 체크 무시)
+router.post('/heartbeat/proactive/test', async (req, res) => {
+  const { institutionId } = req.user!;
+  void runHeartbeatProactiveScan({ force: true, institutionId }).catch(() => undefined);
+  res.json({ ok: true, message: '프로액티브 heartbeat 스캔이 시작되었습니다.' });
+});
+
+// POST /admin/heartbeat/proactive/send — 특정 에이전트/수강생에게 직접 heartbeat 전송 (테스트용)
+const directSendSchema = z.object({
+  agentId: z.string().uuid(),
+  studentId: z.string().uuid(),
+  courseId: z.string().uuid(),
+});
+router.post('/heartbeat/proactive/send', async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = directSendSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const messageId = await sendHeartbeatMessage({ ...parsed.data, institutionId, turnIndex: 0 });
+  if (!messageId) {
+    res.status(422).json({ error: '메시지 전송 실패 — 에이전트 설정 또는 API 키를 확인하세요.' });
+    return;
+  }
+  res.json({ ok: true, messageId });
+});
+
+// GET /admin/agents/:agentId/session — 에이전트 세션 상태 조회 (Session Codec)
+router.get('/agents/:agentId/session', async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = z.object({ agentId: z.string().uuid() }).safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: '유효하지 않은 agentId 형식입니다.' });
+    return;
+  }
+
+  const session = await getAgentSession(parsed.data.agentId, institutionId);
+  if (!session) {
+    res.json({ hasSession: false, sessionParams: null, displayId: null });
+    return;
+  }
+
+  res.json({ hasSession: true, ...session });
+});
+
+// DELETE /admin/agents/:agentId/session — 에이전트 세션 초기화 (Session Codec)
+router.delete('/agents/:agentId/session', async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = z.object({ agentId: z.string().uuid() }).safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: '유효하지 않은 agentId 형식입니다.' });
+    return;
+  }
+
+  const outcome = await clearAgentSession(parsed.data.agentId, institutionId);
+  if (outcome === 'not_found') {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+
+  res.json({ cleared: true, agentId: parsed.data.agentId });
+});
+
 // PUT /admin/routines — 스케줄 설정 (Phase 2 GUI 연동 시 확장)
 router.put('/routines', (_req, res) => {
   res.status(501).json({ message: 'Phase 2 GUI 스케줄 설정기 연동 시 구현 예정' });
@@ -348,25 +1054,490 @@ router.put('/budget', (_req, res) => {
 // ── 에이전트 CRUD (Phase 3-2) ─────────────────────────────────────────────────
 
 const adapterConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'google']),
+  provider: z.enum(['openai', 'anthropic', 'google', 'gemini_cli', 'openclaw']),
   model: z.string().min(1),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().optional(),
   timeoutMs: z.number().int().positive().optional(),
+  adapterType: z.enum(['llm_api', 'http_webhook']).optional(),
+  webhookUrl: z.string().url().optional(),
+  webhookHeaders: z.record(z.string()).optional(),
+  contextMode: z.enum(['thin', 'fat']).optional(),
+  promptTemplate: z.string().max(4000).optional(),
+}).superRefine((value, ctx) => {
+  if (value.adapterType === 'http_webhook' && !value.webhookUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['webhookUrl'],
+      message: 'adapterType이 http_webhook이면 webhookUrl은 필수입니다.',
+    });
+  }
 });
 
 const createAgentSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/),
   role: z.enum(['orchestrator', 'ews_monitor', 'ai_instructor', 'ai_tutor', 'mental_care', 'portfolio_reviewer']),
+  // paperclip: title — 표시용 직함
+  title: z.string().max(120).optional().nullable(),
+  // paperclip: icon — UI 아이콘 식별자
+  icon: z.string().max(60).optional().nullable(),
+  // paperclip: capabilities — 자연어 능력 설명 (위임 탐색용)
+  capabilities: z.string().max(800).optional().nullable(),
   reportsTo: z.string().uuid().optional().nullable(),
   adapterConfig: adapterConfigSchema,
   fallbackAdapterConfig: adapterConfigSchema.optional().nullable(),
+  // paperclip: runtimeConfig — heartbeat 스케줄 설정
+  runtimeConfig: z.object({
+    heartbeat: z.object({
+      enabled: z.boolean().default(false),
+      intervalSec: z.number().int().min(30).max(86400).default(300),
+      maxConcurrentRuns: z.number().int().min(1).max(5).default(1),
+      proactive: z.boolean().optional(),
+      dailyLimit: z.number().int().min(1).max(1000).optional(),
+      promptTemplate: z.string().max(2000).optional(),
+    }).optional(),
+  }).optional().default({}),
+  // paperclip: permissions — 자율 실행 권한
+  permissions: z.object({
+    canHireDirect: z.boolean().default(false),
+    canAssignTasks: z.boolean().default(false),
+    canAccessSecrets: z.boolean().default(false),
+  }).optional().default({}),
   systemPrompt: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
+  // RAG 활성화 여부 — false면 교재 벡터 검색 없이 LLM만 호출 (기본값: true)
+  ragEnabled: z.boolean().default(true),
 });
 
 const updateAgentSchema = createAgentSchema.partial();
+
+const adapterTestSchema = z.object({
+  adapterConfig: adapterConfigSchema,
+});
+
+/**
+ * POST /admin/adapters/test
+ * adapterConfig 사전 검증 (paperclip testEnvironment 참조)
+ */
+router.post('/adapters/test', async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = adapterTestSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+
+  const adapterConfig = parsed.data.adapterConfig;
+
+  // HTTP webhook 어댑터는 실제 연결성까지 점검
+  if (adapterConfig.adapterType === 'http_webhook') {
+    if (!adapterConfig.webhookUrl) {
+      res.status(400).json({ error: 'webhookUrl이 필요합니다.' });
+      return;
+    }
+
+    const secrets = await getSecrets(institutionId);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    for (const [k, v] of Object.entries(adapterConfig.webhookHeaders ?? {})) {
+      headers[k] = interpolateSecretRefs(v, secrets);
+    }
+
+    const timeoutMs = Math.min(adapterConfig.timeoutMs ?? 5000, 15000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(adapterConfig.webhookUrl, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          type: 'openmento_adapter_test',
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      res.json({
+        ok: response.status < 500,
+        adapterType: 'http_webhook',
+        status: response.status,
+        statusText: response.statusText,
+        message: response.status < 500
+          ? 'Webhook endpoint 연결이 확인되었습니다.'
+          : 'Webhook endpoint 연결은 되었지만 서버 오류(5xx)를 반환했습니다.',
+      });
+    } catch (err) {
+      const timedOut = err instanceof Error && err.name === 'AbortError';
+      res.status(502).json({
+        ok: false,
+        adapterType: 'http_webhook',
+        error: timedOut
+          ? `Webhook endpoint 타임아웃 (${timeoutMs}ms)`
+          : (err instanceof Error ? err.message : String(err)),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    return;
+  }
+
+  // LLM API 어댑터는 기관 secrets 존재 여부를 사전 검증
+  const secrets = await getSecrets(institutionId);
+  const missingKeyByProvider: Partial<Record<string, string>> = {
+    openai: 'openaiApiKey',
+    anthropic: 'anthropicApiKey',
+    openclaw: 'openclawApiKey',
+    google: 'geminiApiKey',
+    gemini_cli: 'geminiApiKey',
+  };
+
+  const requiredSecretKey = missingKeyByProvider[adapterConfig.provider];
+  if (requiredSecretKey && !secrets[requiredSecretKey as keyof AdminSecrets]) {
+    res.status(422).json({
+      ok: false,
+      adapterType: adapterConfig.adapterType ?? 'llm_api',
+      error: `${adapterConfig.provider} provider 사용을 위해 secrets.${requiredSecretKey}가 필요합니다.`,
+    });
+    return;
+  }
+
+  res.json({
+    ok: true,
+    adapterType: adapterConfig.adapterType ?? 'llm_api',
+    message: '어댑터 설정이 유효합니다.',
+  });
+});
+
+// ── 조직도 API ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /admin/org
+ * 기관 전체 에이전트를 reportsTo 기반의 재귀 트리로 반환
+ * query ?instructorId=xxx 로 특정 강사 조직도만 필터링 가능
+ *
+ * OrgNode: { id, name, role, status, instructorId, instructorName?, reports: OrgNode[] }
+ */
+router.get('/org', async (req, res) => {
+  const institutionId = req.user?.institutionId;
+  if (!institutionId) { res.status(400).json({ error: 'institutionId 없음' }); return; }
+
+  const filterInstructorId = req.query.instructorId as string | undefined;
+
+  const rows = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      role: agents.role,
+      status: agents.status,
+      reportsTo: agents.reportsTo,
+      instructorId: agents.instructorId,
+      adapterConfig: agents.adapterConfig,
+      icon: agents.icon,
+      title: agents.title,
+    })
+    .from(agents)
+    .where(and(eq(agents.institutionId, institutionId), isNull(agents.deletedAt)));
+
+  // 강사 이름 조회
+  const instructorIds = [...new Set(rows.map(r => r.instructorId).filter(Boolean))] as string[];
+  const instructorNameMap = new Map<string, string>();
+  if (instructorIds.length > 0) {
+    const instructors = await db
+      .select({ id: adminUsers.id, name: adminUsers.name })
+      .from(adminUsers)
+      .where(inArray(adminUsers.id, instructorIds));
+    for (const ins of instructors) instructorNameMap.set(ins.id, ins.name);
+  }
+
+  // reportsTo 기반 재귀 트리 빌드
+  const byParent = new Map<string | null, typeof rows>();
+  for (const row of rows) {
+    const key = row.reportsTo ?? null;
+    const arr = byParent.get(key) ?? [];
+    arr.push(row);
+    byParent.set(key, arr);
+  }
+
+  type OrgNode = {
+    id: string; name: string; role: string; status: string;
+    title: string | null; icon: string | null;
+    instructorId: string | null; instructorName: string | null;
+    reports: OrgNode[];
+  };
+
+  const build = (parentId: string | null): OrgNode[] =>
+    (byParent.get(parentId) ?? []).map(r => ({
+      id: r.id, name: r.name, role: r.role, status: r.status,
+      title: r.title, icon: r.icon,
+      instructorId: r.instructorId ?? null,
+      instructorName: r.instructorId ? (instructorNameMap.get(r.instructorId) ?? null) : null,
+      reports: build(r.id),
+    }));
+
+  let roots = build(null);
+
+  // 강사 필터 — 루트 에이전트의 instructorId가 일치하는 것만
+  if (filterInstructorId) {
+    roots = roots.filter(r => r.instructorId === filterInstructorId);
+  }
+
+  res.json({ org: roots });
+});
+
+/**
+ * GET /admin/org/full
+ * 5계층 조직도: 강사 → 과목 → skills → 에이전트 / 수강생
+ * query ?instructorId=xxx 로 특정 강사 필터링 가능
+ * 미연결 자산(unassigned skills / agents)도 포함
+ */
+router.get('/org/full', async (req, res) => {
+  try {
+  const institutionId = req.user?.institutionId;
+  if (!institutionId) { res.status(400).json({ error: 'institutionId 없음' }); return; }
+
+  const filterInstructorId = req.query.instructorId as string | undefined;
+
+  // 1) 강사 목록 (role: instructor | teacher)
+  const instructorRows = await db
+    .select({ id: adminUsers.id, name: adminUsers.name, role: adminUsers.role })
+    .from(adminUsers)
+    .where(and(
+      eq(adminUsers.institutionId, institutionId),
+      eq(adminUsers.isActive, true),
+      inArray(adminUsers.role, ['instructor', 'teacher']),
+      ...(filterInstructorId ? [eq(adminUsers.id, filterInstructorId)] : []),
+    ));
+
+  // 2) 과목 목록
+  const courseRows = await db
+    .select({ id: courses.id, name: courses.name, subject: courses.subject, instructorId: courses.instructorId })
+    .from(courses)
+    .where(and(eq(courses.institutionId, institutionId), isNull(courses.deletedAt)));
+
+  // 3) 스킬 목록
+  const skillRows = await db
+    .select({
+      id: instructorSkills.id,
+      title: instructorSkills.title,
+      courseId: instructorSkills.courseId,
+      agentId: instructorSkills.agentId,
+      isPrivate: sql<boolean>`"instructor_skills"."is_private"`,
+      scope: sql<string>`"instructor_skills"."scope"`,
+      tags: instructorSkills.tags,
+    })
+    .from(instructorSkills)
+    .where(and(eq(instructorSkills.institutionId, institutionId), isNull(instructorSkills.deletedAt)));
+
+  // 4) 에이전트 목록
+  const agentRows = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      role: agents.role,
+      status: agents.status,
+      title: agents.title,
+      isPrivate: sql<boolean>`"agents"."is_private"`,
+      scope: sql<string>`"agents"."scope"`,
+      model: sql<string | null>`"agents"."adapter_config"->>'model'`,
+    })
+    .from(agents)
+    .where(and(eq(agents.institutionId, institutionId), isNull(agents.deletedAt)));
+
+  // 5) 과목별 수강생 목록 (5계층)
+  const studentCourseRows = await db
+    .select({
+      courseId: studentCourses.courseId,
+      studentId: students.id,
+      displayName: students.displayName,
+      email: students.email,
+    })
+    .from(studentCourses)
+    .innerJoin(students, eq(studentCourses.studentId, students.id))
+    .where(and(
+      eq(students.institutionId, institutionId),
+      isNull(studentCourses.deletedAt),
+      isNull(students.deletedAt),
+    ));
+
+  // courseId → students[] 맵
+  const courseStudentsMap = new Map<string, { id: string; displayName: string | null; email: string | null }[]>();
+  for (const row of studentCourseRows) {
+    if (!row.courseId) continue;
+    const arr = courseStudentsMap.get(row.courseId) ?? [];
+    arr.push({ id: row.studentId, displayName: row.displayName, email: row.email ?? null });
+    courseStudentsMap.set(row.courseId, arr);
+  }
+
+  // 에이전트 Map
+  const agentMap = new Map(agentRows.map(a => [a.id, a]));
+  // 스킬에서 연결된 agentId 집합
+  const connectedAgentIds = new Set(skillRows.map(s => s.agentId).filter(Boolean));
+
+  // 5계층 트리 구성
+  type OrgAgent = { id: string; name: string; role: string; status: string; title: string | null; isPrivate: boolean; scope: string; model: string | null };
+  type OrgSkill = { id: string; title: string; isPrivate: boolean; scope: string; tags: string[] | null; agent: OrgAgent | null };
+  type OrgStudent = { id: string; displayName: string | null; email: string | null };
+  type OrgCourse = { id: string; name: string; subject: string; skills: OrgSkill[]; students: OrgStudent[] };
+  type OrgInstructor = { id: string; name: string; role: string; courses: OrgCourse[] };
+
+  const tree: OrgInstructor[] = instructorRows.map(ins => {
+    const insCourses = courseRows.filter(c => c.instructorId === ins.id);
+    return {
+      id: ins.id,
+      name: ins.name,
+      role: ins.role,
+      courses: insCourses.map(c => {
+        const cSkills = skillRows.filter(s => s.courseId === c.id);
+        return {
+          id: c.id,
+          name: c.name,
+          subject: c.subject,
+          students: courseStudentsMap.get(c.id) ?? [],
+          skills: cSkills.map(s => ({
+            id: s.id,
+            title: s.title,
+            isPrivate: s.isPrivate ?? false,
+            scope: s.scope ?? 'global',
+            tags: s.tags ?? null,
+            agent: s.agentId ? (agentMap.get(s.agentId) ? {
+              id: agentMap.get(s.agentId)!.id,
+              name: agentMap.get(s.agentId)!.name,
+              role: agentMap.get(s.agentId)!.role,
+              status: agentMap.get(s.agentId)!.status,
+              title: agentMap.get(s.agentId)!.title ?? null,
+              isPrivate: agentMap.get(s.agentId)!.isPrivate ?? false,
+              scope: agentMap.get(s.agentId)!.scope ?? 'global',
+              model: agentMap.get(s.agentId)!.model ?? null,
+            } : null) : null,
+          })),
+        };
+      }),
+    };
+  });
+
+  // 미연결 자산 (과목에 연결되지 않은 스킬, 스킬에 연결되지 않은 에이전트)
+  const unassignedSkills = skillRows
+    .filter(s => !s.courseId)
+    .map(s => ({
+      id: s.id,
+      title: s.title,
+      isPrivate: s.isPrivate ?? false,
+      scope: s.scope ?? 'global',
+      tags: s.tags ?? null,
+      agent: s.agentId ? (agentMap.get(s.agentId) ? {
+        id: agentMap.get(s.agentId)!.id,
+        name: agentMap.get(s.agentId)!.name,
+        role: agentMap.get(s.agentId)!.role,
+        status: agentMap.get(s.agentId)!.status,
+        title: agentMap.get(s.agentId)!.title ?? null,
+        isPrivate: agentMap.get(s.agentId)!.isPrivate ?? false,
+        scope: agentMap.get(s.agentId)!.scope ?? 'global',
+        model: agentMap.get(s.agentId)!.model ?? null,
+      } : null) : null,
+    }));
+
+  const unassignedAgents = agentRows
+    .filter(a => !connectedAgentIds.has(a.id))
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      role: a.role,
+      status: a.status,
+      title: a.title ?? null,
+      isPrivate: a.isPrivate ?? false,
+      scope: a.scope ?? 'global',
+      model: a.model ?? null,
+    }));
+
+  res.json({ tree, unassigned: { skills: unassignedSkills, agents: unassignedAgents } });
+  } catch (err: any) {
+    console.error('[org/full]', err);
+    res.status(500).json({ error: '조직도 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+/**
+ * GET /admin/org/instructors
+ * 조직도에 연결된 에이전트가 있는 강사 목록 반환 (선택바용)
+ */
+router.get('/org/instructors', async (req, res) => {
+  try {
+    const institutionId = req.user?.institutionId;
+    if (!institutionId) { res.status(400).json({ error: 'institutionId 없음' }); return; }
+
+    // 과목을 가진 강사/교사 ID 목록
+    const courseRows = await db
+      .select({ instructorId: courses.instructorId })
+      .from(courses)
+      .where(and(eq(courses.institutionId, institutionId), isNull(courses.deletedAt)));
+
+    const ids = [...new Set(courseRows.map(r => r.instructorId).filter(Boolean))] as string[];
+
+    if (ids.length === 0) {
+      // 과목이 없으면 institution 내 instructor/teacher 전체 반환
+      const all = await db
+        .select({ id: adminUsers.id, name: adminUsers.name, role: adminUsers.role })
+        .from(adminUsers)
+        .where(and(
+          eq(adminUsers.institutionId, institutionId),
+          eq(adminUsers.isActive, true),
+          inArray(adminUsers.role, ['instructor', 'teacher']),
+        ));
+      res.json({ instructors: all }); return;
+    }
+
+    const instructors = await db
+      .select({ id: adminUsers.id, name: adminUsers.name, role: adminUsers.role })
+      .from(adminUsers)
+      .where(inArray(adminUsers.id, ids));
+
+    res.json({ instructors });
+  } catch (err) {
+    console.error('[org/instructors]', err);
+    res.status(500).json({ error: '강사 목록 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+/**
+ * PATCH /admin/agents/:id/instructor
+ * 에이전트에 담당 강사 할당
+ */
+router.patch('/agents/:id/instructor', async (req, res) => {
+  const institutionId = req.user?.institutionId;
+  const { id } = req.params;
+  const { instructorId } = req.body as { instructorId: string | null };
+
+  if (instructorId !== null) {
+    const [ins] = await db.select({ id: adminUsers.id })
+      .from(adminUsers).where(eq(adminUsers.id, instructorId)).limit(1);
+    if (!ins) { res.status(404).json({ error: '강사를 찾을 수 없습니다.' }); return; }
+  }
+
+  await db.update(agents)
+    .set({ instructorId: instructorId ?? null, updatedAt: new Date() })
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!), isNull(agents.deletedAt)));
+
+  res.json({ ok: true });
+});
+
+/**
+ * PATCH /admin/agents/:id/reports-to
+ * 에이전트 계층 관계 변경 (reportsTo 수정)
+ */
+router.patch('/agents/:id/reports-to', async (req, res) => {
+  const institutionId = req.user?.institutionId;
+  const { id } = req.params;
+  const { reportsTo } = req.body as { reportsTo: string | null };
+
+  await db.update(agents)
+    .set({ reportsTo: reportsTo ?? null, updatedAt: new Date() })
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!), isNull(agents.deletedAt)));
+
+  res.json({ ok: true });
+});
 
 /**
  * GET /admin/agents
@@ -438,7 +1609,7 @@ router.post('/agents', async (req, res) => {
     return;
   }
 
-  const { reportsTo, fallbackAdapterConfig, ...rest } = parsed.data;
+  const { reportsTo, fallbackAdapterConfig, runtimeConfig, permissions, ...rest } = parsed.data;
 
   // ── [개선①] 순환 참조 사전 차단 ─────────────────────────────────────────
   if (reportsTo) {
@@ -457,6 +1628,8 @@ router.post('/agents', async (req, res) => {
       ...rest,
       reportsTo: reportsTo ?? undefined,
       fallbackAdapterConfig: fallbackAdapterConfig ?? undefined,
+      runtimeConfig: runtimeConfig ?? {},
+      permissions: permissions ?? {},
     })
     .returning();
 
@@ -488,7 +1661,7 @@ router.put('/agents/:id', async (req, res) => {
     return;
   }
 
-  const { reportsTo, fallbackAdapterConfig, ...rest } = parsed.data;
+  const { reportsTo, fallbackAdapterConfig, runtimeConfig, permissions, ...rest } = parsed.data;
 
   // ── [개선①] 순환 참조 사전 차단 ─────────────────────────────────────────
   if (reportsTo) {
@@ -512,6 +1685,8 @@ router.put('/agents/:id', async (req, res) => {
   };
   if (reportsTo !== undefined) updateValues.reportsTo = reportsTo;
   if (fallbackAdapterConfig !== undefined) updateValues.fallbackAdapterConfig = fallbackAdapterConfig;
+  if (runtimeConfig !== undefined) updateValues.runtimeConfig = runtimeConfig;
+  if (permissions !== undefined) updateValues.permissions = permissions;
 
   const [updated] = await db
     .update(agents)
@@ -584,6 +1759,103 @@ router.delete('/agents/:id', async (req, res) => {
   res.json({ deleted: true, id: deleted.id });
 });
 
+/**
+ * POST /admin/agents/:id/pause — 에이전트 일시정지
+ * paperclip: status → 'paused'
+ */
+router.post('/agents/:id/pause', async (req, res) => {
+  const institutionId = req.user?.institutionId;
+  const { id } = req.params;
+  const { reason } = req.body as { reason?: string };
+
+  const [current] = await db
+    .select({ status: agents.status })
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!), isNull(agents.deletedAt)))
+    .limit(1);
+
+  if (!current) {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+  if (current.status === 'terminated') {
+    res.status(409).json({ error: '종료된 에이전트는 상태를 변경할 수 없습니다.' });
+    return;
+  }
+
+  const [updated] = await db
+    .update(agents)
+    .set({ status: 'paused', pauseReason: reason ?? null, budgetPausedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!)))
+    .returning({ id: agents.id, status: agents.status });
+
+  res.json({ agent: updated });
+});
+
+/**
+ * POST /admin/agents/:id/resume — 에이전트 재개 (paused → idle)
+ * paperclip: status → 'idle'
+ */
+router.post('/agents/:id/resume', async (req, res) => {
+  const institutionId = req.user?.institutionId;
+  const { id } = req.params;
+
+  const [current] = await db
+    .select({ status: agents.status })
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!), isNull(agents.deletedAt)))
+    .limit(1);
+
+  if (!current) {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+  if (current.status === 'terminated') {
+    res.status(409).json({ error: '종료된 에이전트는 재개할 수 없습니다.' });
+    return;
+  }
+
+  const [updated] = await db
+    .update(agents)
+    .set({ status: 'idle', pauseReason: null, budgetPausedAt: null, updatedAt: new Date() })
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!)))
+    .returning({ id: agents.id, status: agents.status });
+
+  res.json({ agent: updated });
+});
+
+/**
+ * POST /admin/agents/:id/terminate — 에이전트 영구 종료 (비가역)
+ * paperclip: status → 'terminated'
+ */
+router.post('/agents/:id/terminate', async (req, res) => {
+  const institutionId = req.user?.institutionId;
+  const { id } = req.params;
+
+  const [current] = await db
+    .select({ status: agents.status, name: agents.name })
+    .from(agents)
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!), isNull(agents.deletedAt)))
+    .limit(1);
+
+  if (!current) {
+    res.status(404).json({ error: '에이전트를 찾을 수 없습니다.' });
+    return;
+  }
+  if (current.status === 'terminated') {
+    res.status(409).json({ error: '이미 종료된 에이전트입니다.' });
+    return;
+  }
+
+  const [updated] = await db
+    .update(agents)
+    .set({ status: 'terminated', isActive: false, updatedAt: new Date() })
+    .where(and(eq(agents.id, id), eq(agents.institutionId, institutionId!)))
+    .returning({ id: agents.id, status: agents.status });
+
+  res.json({ agent: updated });
+});
+
 // ── 스킬 파일 CRUD (Phase 3-1) ───────────────────────────────────────────────
 
 const createSkillSchema = z.object({
@@ -592,6 +1864,7 @@ const createSkillSchema = z.object({
   courseId: z.string().uuid().optional(),
   agentId: z.string().uuid().optional(),
   isActive: z.boolean().default(true),
+    tags: z.array(z.string()).optional(),
 });
 
 const updateSkillSchema = z.object({
@@ -600,6 +1873,7 @@ const updateSkillSchema = z.object({
   courseId: z.string().uuid().nullable().optional(),
   agentId: z.string().uuid().nullable().optional(),
   isActive: z.boolean().optional(),
+    tags: z.array(z.string()).optional(),
 });
 
 const importGitHubSkillSchema = z.object({
@@ -636,6 +1910,30 @@ router.get('/skills', async (req, res) => {
 });
 
 /**
+ * GET /admin/skills/:id
+ * 특정 스킬의 상세 정보(마크다운 등을 포함)를 조회합니다.
+ */
+router.get('/skills/:id', async (req, res) => {
+  const { id } = req.params;
+  const { institutionId } = req.user!;
+  
+  const [skill] = await db
+    .select()
+    .from(instructorSkills)
+    .where(
+      and(
+        eq(instructorSkills.id, id),
+        eq(instructorSkills.institutionId, institutionId),
+        isNull(instructorSkills.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (!skill) return res.status(404).json({ error: '스킬을 찾을 수 없습니다.' });
+  res.json(skill);
+});
+
+/**
  * POST /admin/skills
  * 새 스킬 파일을 등록합니다.
  */
@@ -647,11 +1945,11 @@ router.post('/skills', async (req, res) => {
   }
 
   const { institutionId } = req.user!;
-  const { title, markdown, courseId, agentId, isActive } = parsed.data;
+    const { title, markdown, courseId, agentId, isActive, tags } = parsed.data;
 
   const [skill] = await db
     .insert(instructorSkills)
-    .values({ institutionId, title, markdown, courseId, agentId, isActive })
+      .values({ institutionId, title, markdown, courseId, agentId, isActive, tags })
     .returning();
 
   if (agentId) invalidateSkillCache(agentId);
@@ -771,7 +2069,7 @@ router.post('/skills/import-github', async (req, res) => {
   }
 
   const { institutionId } = req.user!;
-  const { rawUrl, title, courseId, agentId } = parsed.data;
+    const { rawUrl, title, courseId, agentId } = parsed.data;
 
   let imported: { markdown: string; sourceRef: string; sourceUrl: string };
   try {
@@ -1829,4 +3127,667 @@ router.use('/system', systemRouter);
 // adminRouter의 authenticate + requireRole('admin') 보호를 그대로 상속합니다.
 router.use('/security', securityRouter);
 
+// [임시 기능]: 대시보드 테스트용 더미 학생 추가
+router.post('/dummy-student', async (req, res) => {
+  const { institutionId } = req.user!;
+  try {
+    const newStudent = await db
+      .insert(students)
+      .values({
+        institutionId,
+        displayName: '홍테스트' + Math.floor(Math.random() * 1000),
+      })
+      .returning();
+    res.json({ success: true, student: newStudent[0] });
+  } catch (error) {
+    console.error('더미 학생 추가 실패:', error);
+    res.status(500).json({ error: '학생 추가 중 오류 발생' });
+  }
+});
+
+
+
+// [신규 기능]: 학생 관리 (학생 목록 조회) — 수강 과목 목록 포함
+router.get('/students', async (req, res) => {
+  const { institutionId } = req.user!;
+  try {
+    const rows = await db
+      .select({
+        id: students.id,
+        anonymousId: students.anonymousId,
+        displayName: students.displayName,
+        courseId: students.courseId,
+        email: students.email,
+        instructorId: students.instructorId,
+      })
+      .from(students)
+      .where(
+        and(
+          eq(students.institutionId, institutionId),
+          isNull(students.deletedAt)
+        )
+      )
+      .orderBy(students.id);
+
+    // 각 수강생의 수강 과목 목록 조회 (M2M)
+    const studentIds = rows.map(r => r.id);
+    let enrollments: { studentId: string; courseId: string; courseName: string; subject: string }[] = [];
+    if (studentIds.length > 0) {
+      enrollments = await db
+        .select({
+          studentId: studentCourses.studentId,
+          courseId: courses.id,
+          courseName: courses.name,
+          subject: courses.subject,
+        })
+        .from(studentCourses)
+        .innerJoin(courses, eq(studentCourses.courseId, courses.id))
+        .where(
+          and(
+            inArray(studentCourses.studentId, studentIds),
+            isNull(studentCourses.deletedAt),
+            isNull(courses.deletedAt),
+          )
+        );
+    }
+
+    // 수강생별로 과목 목록 그룹핑
+    const enrollmentMap = new Map<string, typeof enrollments>();
+    for (const e of enrollments) {
+      const arr = enrollmentMap.get(e.studentId) ?? [];
+      arr.push(e);
+      enrollmentMap.set(e.studentId, arr);
+    }
+
+    const result = rows.map(r => ({
+      ...r,
+      enrolledCourses: enrollmentMap.get(r.id) ?? [],
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('학생 목록 조회 실패', error);
+    res.status(500).json({ error: '학생 목록 조회 중 오류 발생' });
+  }
+});
+
+// [신규 기능]: 학생 추가 (정식 모달 폼 처리용)
+router.post('/students', async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = z.object({ displayName: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: '잘못된 입력입니다.' });
+    return;
+  }
+  try {
+    const newStudent = await db
+      .insert(students)
+      .values({
+        institutionId,
+        displayName: parsed.data.displayName,
+      })
+      .returning({
+        id: students.id,
+        anonymousId: students.anonymousId,
+        displayName: students.displayName
+      });
+    
+    // [신규 기능]: 수강생 직접 회원가입 초대 링크 생성 (Phase 2-2)
+    // 보안을 위해 실제 환경에서는 별도 invitation_tokens 테이블을 권장합니다.
+    // 현재는 anonymousId를 기반으로 임시 초대 토큰을 생성합니다.
+    const inviteUrl = `${req.protocol}://${req.get('host')}/register?token=${newStudent[0].anonymousId}`;
+    
+    res.status(201).json({
+      ...newStudent[0],
+      inviteUrl,
+    });
+  } catch (error) {
+    console.error('신규 학생 추가 실패', error);
+    res.status(500).json({ error: '신규 학생 추가 중 오류 발생' });
+  }
+});
+
+// [신규 기능]: 학생 수정 (displayName, tags)
+router.put('/students/:id', requireRole('admin', 'teacher'), async (req, res) => {
+  const { institutionId } = req.user!;
+  const { id } = req.params;
+  const parsedId = z.string().uuid().safeParse(id);
+  if (!parsedId.success) {
+    res.status(400).json({ error: '잘못된 학생 ID 형식입니다.' });
+    return;
+  }
+  const parsed = z.object({
+    displayName: z.string().min(1).max(200).optional(),
+    tags:        z.array(z.string()).optional(),
+      instructorId: z.string().uuid().nullable().optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    try {
+      const updated = await db.transaction(async (tx) => {
+        const [target] = await tx
+          .select({ id: students.id })
+          .from(students)
+          .where(and(
+            eq(students.id, id),
+            eq(students.institutionId, institutionId),
+            isNull(students.deletedAt),
+          ))
+          .limit(1);
+        if (!target) {
+          return null;
+        }
+
+        const updateData: Record<string, unknown> = { updatedAt: new Date() };
+        if (parsed.data.displayName !== undefined) updateData.displayName = parsed.data.displayName;
+        if (parsed.data.tags !== undefined) updateData.tags = parsed.data.tags;
+        if (parsed.data.instructorId !== undefined) updateData.instructorId = parsed.data.instructorId;
+
+        const updatedRows = await tx
+          .update(students)
+          .set(updateData)
+          .where(and(
+            eq(students.id, id),
+            eq(students.institutionId, institutionId),
+            isNull(students.deletedAt),
+          ))
+          .returning();
+
+        // Guardrail: any accidental multi-row update is treated as fatal and rolled back.
+        if (updatedRows.length !== 1) {
+          throw new Error(`[students:update] 예상 외 수정 건수: ${updatedRows.length}`);
+        }
+
+        return updatedRows[0];
+      });
+
+      if (!updated) {
+        res.status(404).json({ error: '해당 학생을 찾을 수 없습니다.' });
+        return;
+      }
+
+      res.json(updated);
+    } catch (err) {
+    console.error('학생 정보 수정 실패', err);
+    res.status(500).json({ error: '학생 정보 수정 중 오류 발생' });
+  }
+});
+
+// [신규 기능]: 학생 삭제 (Soft Delete)
+router.delete('/students/:id', async (req, res) => {
+  const { institutionId } = req.user!;
+  try {
+    const deleted = await db
+      .update(students)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(students.id, req.params.id),
+        eq(students.institutionId, institutionId)
+      ))
+      .returning({ id: students.id });
+    
+    if (deleted.length === 0) {
+      res.status(404).json({ error: '학생을 찾을 수 없거나 권한이 없습니다.' });
+      return;
+    }
+    
+    res.json({ message: '해당 학생이 성공적으로 비활성화(삭제) 되었습니다.' });
+  } catch (error) {
+    console.error('학생 삭제 실패', error);
+    res.status(500).json({ error: '학생 삭제 중 오류 발생' });
+  }
+});
+
+// ── IAM: 강사 계정 관리 ──────────────────────────────────────────────────────
+
+const instructorCreateSchema = z.object({
+  name:     z.string().min(1).max(100),
+  email:    z.string().email(),
+  password: z.string().min(8).max(128),
+  tags:     z.array(z.string()).optional(),
+});
+
+const instructorUpdateSchema = z.object({
+  name:        z.string().min(1).max(100).optional(),
+  isActive:    z.boolean().optional(),
+  tags:        z.array(z.string()).optional(),
+  permissions: z.number().int().min(0).optional(), // 비트마스크 권한 값
+  studentIds:  z.array(z.string().uuid()).optional(),
+});
+
+/** GET /admin/instructors — 강사 목록 조회 */
+router.get('/instructors', async (req, res) => {
+  const { institutionId } = req.user!;
+  try {
+    const rows = await db
+      .select({
+        id: adminUsers.id,
+        name: adminUsers.name,
+        email: adminUsers.email,
+        role: adminUsers.role,
+        permissions: adminUsers.permissions,
+        isActive: adminUsers.isActive,
+        lastLoginAt: adminUsers.lastLoginAt,
+        createdAt: adminUsers.createdAt,
+      })
+      .from(adminUsers)
+      .where(
+        and(
+          eq(adminUsers.institutionId, institutionId),
+          eq(adminUsers.role, 'teacher'),
+        )
+      )
+      .orderBy(desc(adminUsers.createdAt));
+
+    const mappedStudents = await db
+      .select({
+        id: students.id,
+        instructorId: students.instructorId,
+        displayName: students.displayName,
+      })
+      .from(students)
+      .where(
+        and(
+          eq(students.institutionId, institutionId),
+          isNotNull(students.instructorId)
+        )
+      );
+
+    const result = rows.map((instructor) => ({
+      ...instructor,
+      students: mappedStudents.filter((s) => s.instructorId === instructor.id).map(s => ({ id: s.id, displayName: s.displayName })),
+    }));
+
+    // 강사별 담당 과목 조회
+    const instructorIds = rows.map(r => r.id);
+    type InstructorCourse = { instructorId: string; courseId: string; courseName: string; subject: string };
+    let instructorCourses: InstructorCourse[] = [];
+    if (instructorIds.length > 0) {
+      const rawCourses = await db
+        .select({
+          instructorId: courses.instructorId,
+          courseId: courses.id,
+          courseName: courses.name,
+          subject: courses.subject,
+        })
+        .from(courses)
+        .where(
+          and(
+            inArray(courses.instructorId, instructorIds),
+            isNull(courses.deletedAt),
+          )
+        );
+      instructorCourses = rawCourses
+        .filter((c): c is typeof c & { instructorId: string } => c.instructorId !== null)
+        .map(c => ({
+          instructorId: c.instructorId,
+          courseId: c.courseId,
+          courseName: c.courseName,
+          subject: c.subject,
+        }));
+    }
+    const courseMap = new Map<string, InstructorCourse[]>();
+    for (const c of instructorCourses) {
+      const arr = courseMap.get(c.instructorId) ?? [];
+      arr.push(c);
+      courseMap.set(c.instructorId, arr);
+    }
+
+    const finalResult = result.map(r => ({
+      ...r,
+      assignedCourses: courseMap.get(r.id) ?? [],
+    }));
+
+    res.json(finalResult);
+  } catch (err) {
+    console.error('강사 목록 조회 실패', err);
+    res.status(500).json({ error: '강사 목록 조회 중 오류 발생' });
+  }
+});
+
+/** POST /admin/instructors — 강사 계정 생성 */
+router.post('/instructors', requireRole('admin'), async (req, res) => {
+  const { institutionId } = req.user!;
+  const parsed = instructorCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const { name, email, password, tags } = parsed.data;
+  try {
+    // 이메일 중복 검사
+    const [existing] = await db
+      .select({ id: adminUsers.id })
+      .from(adminUsers)
+      .where(eq(adminUsers.email, email))
+      .limit(1);
+    if (existing) {
+      res.status(409).json({ error: '이미 사용 중인 이메일입니다.' });
+      return;
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const [created] = await db
+      .insert(adminUsers)
+      .values({ institutionId, name, email, passwordHash, role: 'teacher', tags: tags || [] })
+      .returning({
+        id: adminUsers.id,
+        name: adminUsers.name,
+        email: adminUsers.email,
+        role: adminUsers.role,
+        isActive: adminUsers.isActive,
+        createdAt: adminUsers.createdAt,
+      });
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('강사 계정 생성 실패', err);
+    res.status(500).json({ error: '강사 계정 생성 중 오류 발생' });
+  }
+});
+
+/** PUT /admin/instructors/:id — 강사 정보 수정 (이름, 활성/비활성) */
+router.put('/instructors/:id', requireRole('admin'), async (req, res) => {
+  const { institutionId } = req.user!;
+  const { id } = req.params;
+  const parsed = instructorUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  try {
+    const [target] = await db
+      .select({ id: adminUsers.id })
+      .from(adminUsers)
+      .where(and(eq(adminUsers.id, id), eq(adminUsers.institutionId, institutionId), eq(adminUsers.role, 'teacher')))
+      .limit(1);
+    if (!target) {
+      res.status(404).json({ error: '해당 강사 계정을 찾을 수 없습니다.' });
+      return;
+    }
+      const { studentIds, ...restData } = parsed.data;
+
+      const [updated] = await db
+        .update(adminUsers)
+        .set({ ...restData, updatedAt: new Date() })
+        .where(eq(adminUsers.id, id))
+        .returning({
+          id: adminUsers.id,
+          name: adminUsers.name,
+          email: adminUsers.email,
+          isActive: adminUsers.isActive,
+          permissions: adminUsers.permissions,
+        });
+
+      if (studentIds !== undefined) {
+        await db
+          .update(students)
+          .set({ instructorId: null })
+          .where(and(eq(students.instructorId, id), eq(students.institutionId, institutionId)));
+
+        if (studentIds.length > 0) {
+          await db
+            .update(students)
+            .set({ instructorId: id })
+            .where(and(inArray(students.id, studentIds), eq(students.institutionId, institutionId)));
+        }
+      }
+
+      res.json(updated);
+  } catch (err) {
+    console.error('강사 정보 수정 실패', err);
+    res.status(500).json({ error: '강사 정보 수정 중 오류 발생' });
+  }
+});
+
+/** DELETE /admin/instructors/:id — 강사 계정 비활성화 (소프트 삭제) */
+router.delete('/instructors/:id', requireRole('admin'), async (req, res) => {
+  const { institutionId } = req.user!;
+  const { id } = req.params;
+  try {
+    const [target] = await db
+      .select({ id: adminUsers.id })
+      .from(adminUsers)
+      .where(and(eq(adminUsers.id, id), eq(adminUsers.institutionId, institutionId), eq(adminUsers.role, 'teacher')))
+      .limit(1);
+    if (!target) {
+      res.status(404).json({ error: '해당 강사 계정을 찾을 수 없습니다.' });
+      return;
+    }
+    await db
+      .update(adminUsers)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(adminUsers.id, id));
+    res.status(204).send();
+  } catch (err) {
+    console.error('강사 계정 비활성화 실패', err);
+    res.status(500).json({ error: '강사 계정 비활성화 중 오류 발생' });
+  }
+});
+
+/**
+ * GET /admin/students/:studentId/submissions
+ * 특정 학생이 제출한 과제(댓글 형태) 목록 조회
+ * assignmentComments 테이블에서 해당 학생이 작성한 댓글로 조회합니다.
+ */
+router.get('/students/:studentId/submissions', async (req, res) => {
+  const { studentId } = req.params;
+  const { institutionId } = req.user!;
+
+  // 해당 기관 과목의 과제에 수강생이 작성한 댓글 전체 조회
+  const submissions = await db
+    .select({
+      commentId: assignmentComments.id,
+      content: assignmentComments.content,
+      createdAt: assignmentComments.createdAt,
+      assignmentId: assignments.id,
+      assignmentTitle: assignments.title,
+      dueAt: assignments.dueAt,
+      courseName: courses.name,
+      courseId: courses.id,
+    })
+    .from(assignmentComments)
+    .innerJoin(assignments, eq(assignmentComments.assignmentId, assignments.id))
+    .innerJoin(courses, eq(assignments.courseId, courses.id))
+    .where(
+      and(
+        eq(assignmentComments.studentId, studentId),
+        eq(courses.institutionId, institutionId),
+        isNull(assignmentComments.deletedAt),
+        isNull(assignments.deletedAt),
+      ),
+    )
+    .orderBy(desc(assignmentComments.createdAt));
+
+  res.json({ submissions });
+});
+
 export default router;
+
+// ── 수강생 스킬 매핑 (Phase 10: Student-Skill Mapping) ───────────────────────────────────
+
+/**
+ * GET /admin/students/:studentId/skills
+ * 특정 학생에게 할당된 스킬 목록 조회
+ */
+router.get('/students/:studentId/skills', async (req, res) => {
+  const { studentId } = req.params;
+  const { institutionId } = req.user!;
+
+  const rows = await db
+    .select({
+      id: studentSkills.id,
+      studentId: studentSkills.studentId,
+      skillId: studentSkills.skillId,
+      isActive: studentSkills.isActive,
+      assignedAt: studentSkills.assignedAt,
+      skillTitle: instructorSkills.title,
+    })
+    .from(studentSkills)
+    .innerJoin(instructorSkills, eq(studentSkills.skillId, instructorSkills.id))
+    .where(
+      and(
+        eq(studentSkills.studentId, studentId),
+        eq(instructorSkills.institutionId, institutionId)
+      )
+    )
+    .orderBy(desc(studentSkills.assignedAt));
+
+  res.json({ bindings: rows });
+});
+
+/**
+ * POST /admin/students/:studentId/skills
+ * 수강생에게 특정 교재/상황별 스킬 매핑 (할당)
+ */
+router.post('/students/:studentId/skills', async (req, res) => {
+  const { studentId } = req.params;
+  const { skillId } = req.body;
+
+  if (!skillId) {
+    return res.status(400).json({ error: 'skillId가 필요합니다.' });
+  }
+
+  // 중복 검사
+  const [existing] = await db
+    .select()
+    .from(studentSkills)
+    .where(
+      and(
+        eq(studentSkills.studentId, studentId),
+        eq(studentSkills.skillId, skillId)
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    return res.status(409).json({ error: '이미 할당된 스킬입니다.' });
+  }
+
+  const [inserted] = await db
+    .insert(studentSkills)
+    .values({ studentId, skillId, isActive: true })
+    .returning();
+
+  res.status(201).json({ binding: inserted });
+});
+
+/**
+ * DELETE /admin/students/:studentId/skills/:skillId
+ * 수강생에게 할당된 스킬 매핑 해제
+ */
+router.delete('/students/:studentId/skills/:skillId', async (req, res) => {
+  const { studentId, skillId } = req.params;
+
+  await db
+    .delete(studentSkills)
+    .where(
+      and(
+        eq(studentSkills.studentId, studentId),
+        eq(studentSkills.skillId, skillId)
+      )
+    );
+
+  res.json({ message: '할당 해제되었습니다.' });
+});
+
+/**
+ * GET /admin/attendance/summary
+ * 전체 수강생의 출결 현황 집계 반환
+ */
+router.get('/attendance/summary', async (req, res) => {
+  const { institutionId } = req.user!;
+  try {
+    // 기관 수강생 목록
+    const studentRows = await db
+      .select({
+        id: students.id,
+        displayName: students.displayName,
+        email: students.email,
+      })
+      .from(students)
+      .where(and(eq(students.institutionId, institutionId), isNull(students.deletedAt)));
+
+    if (studentRows.length === 0) {
+      res.json({ summary: [] });
+      return;
+    }
+
+    const studentIds = studentRows.map(r => r.id);
+
+    // 수강생별 수강 과목 목록
+    const enrollments = await db
+      .select({
+        studentId: studentCourses.studentId,
+        courseId: courses.id,
+        courseName: courses.name,
+      })
+      .from(studentCourses)
+      .innerJoin(courses, eq(studentCourses.courseId, courses.id))
+      .where(
+        and(
+          inArray(studentCourses.studentId, studentIds),
+          isNull(studentCourses.deletedAt),
+          isNull(courses.deletedAt),
+        )
+      );
+
+    // 수강생별 출결 집계
+    const logs = await db
+      .select({
+        studentId: attendanceLogs.studentId,
+        status: attendanceLogs.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(attendanceLogs)
+      .where(
+        and(
+          inArray(attendanceLogs.studentId, studentIds),
+          isNull(attendanceLogs.deletedAt),
+        )
+      )
+      .groupBy(attendanceLogs.studentId, attendanceLogs.status);
+
+    // Map 구성
+    const enrollMap = new Map<string, { courseId: string; courseName: string }[]>();
+    for (const e of enrollments) {
+      const arr = enrollMap.get(e.studentId) ?? [];
+      arr.push({ courseId: e.courseId, courseName: e.courseName });
+      enrollMap.set(e.studentId, arr);
+    }
+
+    const logMap = new Map<string, Record<string, number>>();
+    for (const l of logs) {
+      const m = logMap.get(l.studentId) ?? {};
+      m[l.status] = l.count;
+      logMap.set(l.studentId, m);
+    }
+
+    const summary = studentRows.map(s => {
+      const stat = logMap.get(s.id) ?? {};
+      const present = stat['present'] ?? 0;
+      const absent = stat['absent'] ?? 0;
+      const late = stat['late'] ?? 0;
+      const excused = stat['excused'] ?? 0;
+      const total = present + absent + late + excused;
+      const rate = total > 0 ? Math.round(((present + late) / total) * 100) : null;
+      return {
+        id: s.id,
+        displayName: s.displayName,
+        email: s.email,
+        courses: enrollMap.get(s.id) ?? [],
+        present,
+        absent,
+        late,
+        excused,
+        total,
+        rate,
+      };
+    });
+
+    res.json({ summary });
+  } catch (err) {
+    console.error('attendance summary 조회 실패', err);
+    res.status(500).json({ error: '출결 현황 조회 중 오류 발생' });
+  }
+});

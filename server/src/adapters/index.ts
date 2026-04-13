@@ -15,6 +15,8 @@ import type { AdapterConfig, ILlmAdapter } from './llm.interface.js';
 import { OpenAiAdapter } from './openai.adapter.js';
 import { AnthropicAdapter } from './anthropic.adapter.js';
 import { GoogleAdapter } from './google.adapter.js';
+import { GeminiCliAdapter } from './gemini-cli.adapter.js';
+import { OpenClawAdapter } from './openclaw.adapter.js';
 import { getCircuitBreaker } from '../services/circuit-breaker.js';
 import { sendSystemAlert } from '../services/slack-notifier.js';
 
@@ -26,6 +28,10 @@ export function createAdapter(config: AdapterConfig): ILlmAdapter {
       return new AnthropicAdapter(config);
     case 'google':
       return new GoogleAdapter(config);
+    case 'gemini_cli':
+      return new GeminiCliAdapter(config);
+    case 'openclaw':
+      return new OpenClawAdapter(config);
     default: {
       const _exhaustive: never = config.provider;
       throw new Error(`지원하지 않는 LLM 프로바이더: ${_exhaustive}`);

@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { RISK_BADGE } from './StudentRow';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 export interface EwsStudent {
   scoreId: string;
@@ -143,11 +143,21 @@ export function EwsRiskCard({
       {/* 컴포넌트 점수 */}
       {student.componentScores && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {Object.entries(student.componentScores).map(([key, val]) => (
-            <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-lg">
-              {key}: <strong>{val}</strong>
-            </span>
-          ))}
+          {Object.entries(student.componentScores).map(([key, val]) => {
+            const labelMap: Record<string, string> = {
+              attendance:    '출석',
+              assignment:    '과제',
+              counseling:    '상담',
+              aiInteraction: 'AI참여',
+              tutorUsage:    'AI참여',  // 구버전 호환
+            };
+            const label = labelMap[key] ?? key;
+            return (
+              <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-lg">
+                {label}: <strong>{val}</strong>
+              </span>
+            );
+          })}
         </div>
       )}
 

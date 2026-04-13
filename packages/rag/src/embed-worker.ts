@@ -13,13 +13,17 @@
 import { workerData, parentPort } from 'worker_threads';
 import { readFile } from 'fs/promises';
 import { parseDocument } from './chunker.js';
-import { embedBatch } from './embedder.js';
+import { embedBatch, embedBatchWithProvider } from './embedder.js';
+import type { EmbeddingProvider } from './embedder.js';
 import type { TextChunk, SourceType } from './chunker.js';
 
 // ─── 프로토콜 타입 ─────────────────────────────────────────────────────────
 export interface WorkerInput {
   filePath: string; // OS 임시 디렉토리의 물리 파일 경로
   fileName: string; // 원본 파일명 (확장자 판별에 사용)
+  enableRag?: boolean;                  // false면 임베딩 생략
+  embeddingProvider?: EmbeddingProvider; // RAG 임베딩 프로바이더 (기본: openai)
+  embeddingApiKey?: string;              // 해당 프로바이더 API 키
 }
 
 export interface WorkerOutput {
@@ -58,9 +62,18 @@ export interface WorkerError {
       return;
     }
 
+    const enableRag = input.enableRag ?? true;
+
     // 3. 배치 임베딩 (Network I/O + 지수 백오프 재시도)
+    //    enableRag=false 이면 파싱/청킹만 수행하고 임베딩은 저장하지 않습니다.
     const texts = chunks.map((c) => c.text);
-    const embeddings = await embedBatch(texts);
+    const embeddings = enableRag
+      ? (
+        input.embeddingProvider && input.embeddingApiKey
+          ? await embedBatchWithProvider(texts, input.embeddingProvider, input.embeddingApiKey)
+          : await embedBatch(texts)
+      )
+      : [];
 
     const output: WorkerOutput = { success: true, chunks, embeddings, sourceType };
     parentPort.postMessage(output);

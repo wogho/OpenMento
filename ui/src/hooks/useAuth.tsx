@@ -11,7 +11,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 export interface AuthUser {
   sub: string;          // userId
   institutionId: string;
-  role: 'student' | 'instructor' | 'admin';
+  institutionName?: string;
+  role: 'student' | 'teacher' | 'admin';
   name?: string;
 }
 
@@ -31,10 +32,14 @@ const TOKEN_KEY = 'openmento_token';
 function decodeJwt(token: string): AuthUser | null {
   try {
     const payload = token.split('.')[1];
-    const decoded = JSON.parse(atob(payload));
+    // base64url → base64 → UTF-8 바이트 → TextDecoder로 한글 등 멀티바이트 문자 안전 처리
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const decoded = JSON.parse(new TextDecoder('utf-8').decode(bytes));
     return {
       sub: decoded.sub,
       institutionId: decoded.institutionId,
+      institutionName: decoded.institutionName,
       role: decoded.role,
       name: decoded.name,
     };

@@ -6,6 +6,7 @@ import {
   integer,
   customType,
   index,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { institutions } from './institutions.js';
@@ -40,12 +41,16 @@ export const ragDocuments = pgTable('rag_documents', {
   // 원본 파일 정보
   sourceFileName: text('source_file_name').notNull(),
   sourceType: text('source_type').notNull(), // 'pdf', 'markdown', 'text'
+  // 분류 및 태그 (RAG 필터링용)
+  category: text('category'),
+  tags: jsonb('tags').$type<string[]>(), // 배열 형태의 태그
   // 청킹 정보
   chunkIndex: integer('chunk_index').notNull(),
   chunkText: text('chunk_text').notNull(),
   // pgvector 임베딩 (text-embedding-3-small: 1536 차원)
   embedding: vector('embedding', { dimensions: 1536 } as unknown as undefined),
   // 메타데이터
+  metadata: jsonb('metadata'), // 문서 저자, 발간일, 원본 URL 등
   pageNumber: integer('page_number'),
   tokenCount: integer('token_count'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

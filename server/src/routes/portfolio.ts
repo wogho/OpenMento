@@ -40,7 +40,7 @@ const router: ReturnType<typeof Router> = Router();
 
 // 수강생·강사·관리자 모두 접근 가능 (수강생이 주 사용자)
 router.use(authenticate);
-router.use(requireRole('student', 'instructor', 'admin'));
+router.use(requireRole('student', 'teacher', 'admin'));
 
 // ── 입력 검증 스키마 ──────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ router.put('/:goalId/draft', async (req, res) => {
 
 // ── POST /portfolio/:goalId/hitl-review — 강사 HITL 승인/거부 (개선③) ────────
 
-router.post('/:goalId/hitl-review', requireRole('instructor', 'admin'), async (req, res) => {
+router.post('/:goalId/hitl-review', requireRole('teacher', 'admin'), async (req, res) => {
   const { goalId } = req.params;
 
   const goalIdParsed = goalIdSchema.safeParse(goalId);
@@ -348,7 +348,7 @@ router.get('/:goalId', async (req, res) => {
 // ── 페르소나 CRUD (개선①) — 강사/관리자 전용 ─────────────────────────────────
 
 // GET /portfolio/personas/list — DB 기반 전체 목록 (legacyKey 포함)
-router.get('/personas/list', requireRole('instructor', 'admin'), async (req, res) => {
+router.get('/personas/list', requireRole('teacher', 'admin'), async (req, res) => {
   try {
     const { institutionId } = req.user!;
     const personas = await listPersonas(institutionId);
@@ -360,7 +360,7 @@ router.get('/personas/list', requireRole('instructor', 'admin'), async (req, res
 });
 
 // POST /portfolio/personas — 커스텀 페르소나 생성
-router.post('/personas', requireRole('instructor', 'admin'), async (req, res) => {
+router.post('/personas', requireRole('teacher', 'admin'), async (req, res) => {
   const parsed = personaCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
@@ -379,7 +379,7 @@ router.post('/personas', requireRole('instructor', 'admin'), async (req, res) =>
 });
 
 // PUT /portfolio/personas/:id — 커스텀 페르소나 수정
-router.put('/personas/:id', requireRole('instructor', 'admin'), async (req, res) => {
+router.put('/personas/:id', requireRole('teacher', 'admin'), async (req, res) => {
   const { id } = req.params;
   const parsed = personaUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -399,7 +399,7 @@ router.put('/personas/:id', requireRole('instructor', 'admin'), async (req, res)
 });
 
 // DELETE /portfolio/personas/:id — 커스텀 페르소나 Soft Delete
-router.delete('/personas/:id', requireRole('instructor', 'admin'), async (req, res) => {
+router.delete('/personas/:id', requireRole('teacher', 'admin'), async (req, res) => {
   const { id } = req.params;
   const { institutionId } = req.user!;
 

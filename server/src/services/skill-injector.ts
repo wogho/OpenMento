@@ -9,6 +9,11 @@
  *    - importSkillFromGitHub(): GitHub Raw URL에서 마크다운 + sourceRef 추출
  *    - DB 접근 불가(테스트/offline) 시 null 반환으로 안전하게 동작
  *
+ *  ── 스킬 조회 우선순위 ─────────────────────────────────────────────────
+ *  1순위: instructor_skills DB (강사 커스텀 스킬)
+ *  2순위: server/src/skills/*.md 기본 스킬 레지스트리 (에이전트 role 기반)
+ *  3순위: null (호출부에서 하드코딩된 인라인 프롬프트 사용)
+ *
  *  admin.ts (skill CRUD) ──┐
  *                          ├─► skillCache + instructor_skills DB ──► tutor-agent.ts
  *  tutor-agent.ts ◄────────┘
@@ -18,6 +23,7 @@ import { LRUCache } from 'lru-cache';
 import type { Db } from '@openmento/db';
 import { instructorSkills } from '@openmento/db/schema';
 import { eq, and, isNull, desc } from '@openmento/db';
+import { getDefaultSkillByRole } from './skill-registry.js';
 
 // ── Write-Through LRU 캐시 ───────────────────────────────────────────────────
 // agentId → (markdown | null)
@@ -44,12 +50,16 @@ export function initSkillInjectorDb(db: Db): void {
 
 /**
  * 에이전트에 바인딩된 활성 스킬 마크다운을 반환합니다.
- * 캐시 미스이고 DB가 주입된 경우 DB를 조회하여 캐시에 적재합니다.
- * DB 접근도 불가능하거나 스킬이 없으면 null을 반환합니다.
+ * 조회 우선순위: 1) DB 커스텀 스킬 → 2) 기본 스킬 레지스트리 → 3) null
+ *
+ * @param agentId       에이전트 UUID (DB 조회 키)
+ * @param institutionId 기관 UUID (멀티테넌트 격리)
+ * @param agentRole     에이전트 역할 (기본 스킬 폴백용, 옵셔널)
  */
 export async function getSkillMarkdown(
   agentId: string,
   institutionId: string,
+  agentRole?: string,
 ): Promise<string | null> {
   if (skillCache.has(agentId)) {
     const cached = skillCache.get(agentId)!;
@@ -57,7 +67,8 @@ export async function getSkillMarkdown(
   }
 
   if (!_db) {
-    return null;
+    // DB 없음 → 기본 스킬 레지스트리 폴백
+    return agentRole ? getDefaultSkillByRole(agentRole) : null;
   }
 
   try {
@@ -75,9 +86,17 @@ export async function getSkillMarkdown(
       .orderBy(desc(instructorSkills.createdAt))
       .limit(1);
 
-    const markdown = skill?.markdown ?? NEGATIVE_SENTINEL;
-    skillCache.set(agentId, markdown);
-    return markdown === NEGATIVE_SENTINEL ? null : markdown;
+    if (skill?.markdown) {
+      // 1순위: DB 커스텀 스킬
+      skillCache.set(agentId, skill.markdown);
+      return skill.markdown;
+    }
+
+    // 2순위: 기본 스킬 레지스트리 폴백 (커스텀 스킬 없을 때)
+    const defaultSkill = agentRole ? getDefaultSkillByRole(agentRole) : null;
+    // negative caching: 기본 스킬도 없으면 SENTINEL 캐시
+    skillCache.set(agentId, defaultSkill ?? NEGATIVE_SENTINEL);
+    return defaultSkill;
   } catch (err) {
     console.warn('[SkillInjector] DB 조회 실패, null 반환합니다.', err);
     return null;

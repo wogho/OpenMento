@@ -312,6 +312,7 @@ export interface RecordCostParams {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  costUsd?: number;
 }
 
 /**
@@ -323,7 +324,8 @@ export interface RecordCostParams {
 export async function recordCostEvent(params: RecordCostParams): Promise<void> {
   ensureFlushTimer();
   const { institutionId, agentId, provider, model, inputTokens, outputTokens } = params;
-  const costUsd = await calcCostUsd(model, inputTokens, outputTokens);
+  const costUsd = params.costUsd ?? await calcCostUsd(model, inputTokens, outputTokens);
+  const costCents = Math.round(costUsd * 100);
 
   // 버퍼에 추가
   _buffer.push({ institutionId, agentId, provider, model, promptTokens: inputTokens, completionTokens: outputTokens, costUsd });
@@ -331,7 +333,16 @@ export async function recordCostEvent(params: RecordCostParams): Promise<void> {
   // Redis 캐시 증분 (fire-and-forget)
   void incrementRedisSpend(institutionId, agentId, costUsd);
 
-  logger.debug({ institutionId, agentId, model, costUsd }, '[budget-guard] 비용 이벤트 버퍼 추가');
+  // 에이전트별 spentMonthlyCents 누적 업데이트 (paperclip budget 연동)
+  if (agentId && costCents > 0) {
+    void db
+      .update(agents)
+      .set({ spentMonthlyCents: sql`COALESCE(spent_monthly_cents, 0) + ${costCents}` })
+      .where(and(eq(agents.id, agentId), eq(agents.institutionId, institutionId)))
+      .catch((err) => logger.warn({ err, agentId }, '[budget-guard] spentMonthlyCents 업데이트 실패 (무시)'));
+  }
+
+  logger.debug({ institutionId, agentId, model, costUsd, costCents }, '[budget-guard] 비용 이벤트 버퍼 추가');
 
   // 버퍼 임계치 초과 시 즉시 플러시
   if (_buffer.length >= FLUSH_BATCH_SIZE) {
@@ -391,14 +402,14 @@ export async function checkProactiveBudget(
   // 100% 초과 → 차단
   if (pctUsed >= 100) {
     if (effectivePolicy.onExceed === 'pause') {
-      // 개선①: budgetPausedAt 기록 → 월별 Cron이 이 필드로 재활성화 대상 식별
+      // budgetPausedAt 기록 + status='paused' 동시 설정 (paperclip 상태 머신 연동)
       await db
         .update(agents)
-        .set({ isActive: false, budgetPausedAt: new Date() })
+        .set({ isActive: false, budgetPausedAt: new Date(), status: 'paused' })
         .where(and(eq(agents.id, agentId), eq(agents.institutionId, institutionId)));
       logger.warn(
         { agentId, pctUsed: pctUsed.toFixed(1) },
-        '[budget-guard] 예산 초과 — 에이전트 자동 비활성화 (budgetPausedAt 기록)',
+        '[budget-guard] 예산 초과 — 에이전트 status=paused + 비활성화',
       );
     }
     return {

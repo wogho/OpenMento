@@ -5,7 +5,7 @@
  * HNSW 인덱스(vector_cosine_ops)를 활용하므로 수천 청크도 고속 검색 가능합니다.
  */
 
-import { sql, and, isNull } from 'drizzle-orm';
+import { sql, and, isNull, isNotNull } from 'drizzle-orm';
 import { db, ragDocuments } from '@openmento/db';
 import { embedText } from './embedder.js';
 
@@ -15,6 +15,8 @@ export interface SearchOptions {
   courseId?: string;       // 특정 과목으로 범위 제한
   topK?: number;           // 상위 k개 반환 (기본 3)
   maxDistance?: number;    // 코사인 거리 임계값 (기본 0.4 — 유사도 0.6 이상)
+  /** 임베딩 API 키 (env OPENAI_API_KEY 대신 사용). 미지정 시 환경변수 사용. */
+  apiKey?: string;
 }
 
 export interface SearchResult {
@@ -46,7 +48,7 @@ export async function searchSimilarChunks(
   } = options;
 
   // 1. 질문 임베딩 생성
-  const queryEmbedding = await embedText(query);
+  const queryEmbedding = await embedText(query, options.apiKey);
   const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
   // 2. pgvector cosine_distance 검색
@@ -54,6 +56,7 @@ export async function searchSimilarChunks(
   const filters = [
     sql`${ragDocuments.institutionId} = ${institutionId}::uuid`,
     isNull(ragDocuments.deletedAt), // Soft Delete 필터
+    isNotNull(ragDocuments.embedding),
   ];
 
   if (courseId) {

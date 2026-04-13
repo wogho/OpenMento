@@ -21,15 +21,18 @@
  *
  * ────────────────────────────────────────────────────────────────────────────
  *
- * 위험 점수 계산 (총 100점):
- *  ┌──────────────────────┬──────┬──────────────────────────────────────────┐
- *  │ 요소                 │ 가중치│ 임계 조건                                │
- *  ├──────────────────────┼──────┼──────────────────────────────────────────┤
- *  │ 출석률               │  40% │ 최근 5일 중 2일 이상 결석                │
- *  │ 과제 미제출          │  35% │ 최근 3개 중 2개 미제출(missing/late)     │
- *  │ 강사 상담 이력       │  15% │ 최근 2주 내 부정적 상담 기록             │
- *  │ AI 튜터 활용 감소    │  10% │ 전주 대비 접속 빈도 50% 이하             │
- *  └──────────────────────┴──────┴──────────────────────────────────────────┘
+ * 위험 점수 계산 (총 100점 — 적응형 가중치):
+ *  ┌────────────────────────────┬──────┬──────┬──────────────────────────────────────────┐
+ *  │ 요소                       │ 기본 │ LMS미│ 임계 조건                                │
+ *  │                            │ 가중 │ 연동시│                                         │
+ *  ├────────────────────────────┼──────┼──────┼──────────────────────────────────────────┤
+ *  │ AI 상호작용 복합 지표       │  40% │  60% │ 14일 활동일 ≤ 2일, 이번 주 급감          │
+ *  │ 과제 미제출                 │  25% │  25% │ 최근 3개 중 2개 이상 missing/late        │
+ *  │ 강사 상담 이력              │  15% │  15% │ 최근 2주 내 부정적 상담 기록             │
+ *  │ 출석률 (LMS 연동 시만 적용) │  20% │   0% │ 최근 5일 중 2일 이상 결석                │
+ *  └────────────────────────────┴──────┴──────┴──────────────────────────────────────────┘
+ *
+ *  ※ LMS 미연동(출결 데이터 없음) 시 출석률 가중치 20점을 AI 상호작용에 재배분 (40→60)
  *
  * 점수 해석:
  *  - 0~59:  일반 (Normal)
@@ -52,10 +55,23 @@ import { logger } from '../utils/logger.js';
 
 // ── 상수 ────────────────────────────────────────────────────────────────────
 
-const WEIGHT_ATTENDANCE  = 40;
-const WEIGHT_ASSIGNMENT  = 35;
-const WEIGHT_COUNSELING  = 15;
-const WEIGHT_TUTOR_USAGE = 10;
+/**
+ * EWS 가중치 상수 (LMS 연동 기반 적응형)
+ *
+ *  - WEIGHT_ATTENDANCE:     출석률 (LMS 연동 시에만 적용, 미연동 시 0점)
+ *  - WEIGHT_ASSIGNMENT:     과제 미제출
+ *  - WEIGHT_COUNSELING:     강사 상담 이력
+ *  - WEIGHT_AI_BASE:        AI 상호작용 기본 가중치 (LMS 연동 시)
+ *  - WEIGHT_AI_NO_LMS_BONUS: LMS 미연동 시 출석 가중치가 AI 상호작용으로 재배분되는 가산점
+ *
+ * LMS 연동 시:     attendance(20) + assignment(25) + counseling(15) + aiInteraction(40) = 100
+ * LMS 미연동 시:   assignment(25) + counseling(15) + aiInteraction(60) = 100
+ */
+const WEIGHT_ATTENDANCE       = 20;
+const WEIGHT_ASSIGNMENT       = 25;
+const WEIGHT_COUNSELING       = 15;
+const WEIGHT_AI_BASE          = 40;
+const WEIGHT_AI_NO_LMS_BONUS  = 20; // LMS 미연동 시 AI 가중치에 추가 (40 → 60)
 
 // ── KST 날짜 유틸리티 ────────────────────────────────────────────────────────
 
@@ -93,10 +109,10 @@ function kstDateStrDaysAgo(daysAgo: number): string {
 // ── 타입 정의 ────────────────────────────────────────────────────────────────
 
 export interface EwsComponentScores {
-  attendance: number;   // 0~40
-  assignment: number;   // 0~35
-  counseling: number;   // 0~15
-  tutorUsage: number;   // 0~10
+  attendance: number;    // 0~20 (LMS 연동 없으면 0, 가중치는 aiInteraction으로 재배분)
+  assignment: number;    // 0~25
+  counseling: number;    // 0~15
+  aiInteraction: number; // 0~40 (LMS 연동 시) or 0~60 (LMS 미연동 시)
 }
 
 export interface EwsScoreResult {
@@ -113,16 +129,16 @@ type StudentRow = { id: string; courseId: string };
 // ── 메모리 내 세부 점수 산출 (순수 함수) ─────────────────────────────────────
 
 export function scoreAttendance(absentDays: number, hasData: boolean): number {
-  if (!hasData)    return WEIGHT_ATTENDANCE;                          // 데이터 없음 → 최악 가정
+  if (!hasData)    return 0;                                          // LMS 미연동 → 0 (가중치 재배분)
   if (absentDays === 0) return 0;
-  if (absentDays === 1) return Math.round(WEIGHT_ATTENDANCE * 0.5);  // 20점
-  return WEIGHT_ATTENDANCE;                                           // 2일 이상 → 40점
+  if (absentDays === 1) return Math.round(WEIGHT_ATTENDANCE * 0.5);  // 10점
+  return WEIGHT_ATTENDANCE;                                           // 2일 이상 → 20점
 }
 
 export function scoreAssignment(missingCount: number): number {
   if (missingCount === 0) return 0;
-  if (missingCount === 1) return Math.round(WEIGHT_ASSIGNMENT * 0.5); // 18점
-  return WEIGHT_ASSIGNMENT;                                            // 2개 이상 → 35점
+  if (missingCount === 1) return Math.round(WEIGHT_ASSIGNMENT * 0.5); // 13점
+  return WEIGHT_ASSIGNMENT;                                            // 2개 이상 → 25점
 }
 
 export function scoreCounseling(negativeCount: number): number {
@@ -131,14 +147,71 @@ export function scoreCounseling(negativeCount: number): number {
   return WEIGHT_COUNSELING;                                             // 2건 이상 → 15점
 }
 
+/**
+ * AI 상호작용 복합 지표 점수 산출 (신규 핵심 지표)
+ *
+ * LMS 연동 여부에 따라 최대 가중치가 달라집니다:
+ *  - LMS 연동:    최대 40점 (WEIGHT_AI_BASE)
+ *  - LMS 미연동:  최대 60점 (WEIGHT_AI_BASE + WEIGHT_AI_NO_LMS_BONUS)
+ *
+ * 지표 구성 (세 가지 복합):
+ *  1. 활동일 부재 (14일 기준): 오랫동안 AI를 사용하지 않을수록 높은 위험 점수
+ *  2. 이번 주 활동 급감: 전주 대비 50% 미만으로 줄어들 경우 추가 가산
+ *  3. 완전 비활성: 14일 간 메시지 0건 → 최고 위험
+ *
+ * @param activeDays    최근 14일 중 AI와 대화한 고유 날짜 수
+ * @param thisWeekMsgs  이번 주(7일) 메시지 수
+ * @param lastWeekMsgs  전주(8~14일) 메시지 수
+ * @param total14dMsgs  14일 전체 메시지 수
+ * @param hasLms        LMS 연동 여부 (false 시 가중치 20점 추가)
+ */
+export function scoreAiInteraction(
+  activeDays: number,
+  thisWeekMsgs: number,
+  lastWeekMsgs: number,
+  total14dMsgs: number,
+  hasLms: boolean,
+): number {
+  const maxWeight = WEIGHT_AI_BASE + (hasLms ? 0 : WEIGHT_AI_NO_LMS_BONUS);
+
+  // 1. 14일 완전 비활성 → 즉시 최고 점수
+  if (total14dMsgs === 0) return maxWeight;
+
+  // 2. 활동일 기반 점수 (14일 중 몇 일 사용했는지)
+  let dayScore: number;
+  if (activeDays === 0)      dayScore = maxWeight;                        // 사용 없음
+  else if (activeDays <= 2)  dayScore = Math.round(maxWeight * 0.75);     // 14일 중 1~2일
+  else if (activeDays <= 5)  dayScore = Math.round(maxWeight * 0.45);     // 3~5일
+  else if (activeDays <= 8)  dayScore = Math.round(maxWeight * 0.15);     // 6~8일
+  else                       dayScore = 0;                                 // 9일 이상 → 정상
+
+  // 3. 이번 주 활동 급감 (전주 대비 50% 미만)
+  let trendPenalty = 0;
+  if (lastWeekMsgs > 0 && thisWeekMsgs < lastWeekMsgs * 0.5) {
+    trendPenalty = Math.round(maxWeight * 0.25);
+  } else if (lastWeekMsgs > 0 && thisWeekMsgs === 0) {
+    // 전주엔 활발했는데 이번 주 완전 중단 → 즉시 최고 점수
+    return maxWeight;
+  }
+
+  // dayScore가 이미 높으면 trend 중복 가산을 억제
+  const combined = dayScore >= Math.round(maxWeight * 0.75)
+    ? dayScore
+    : Math.min(dayScore + trendPenalty, maxWeight);
+
+  return combined;
+}
+
+/** @deprecated scoreAiInteraction 으로 대체. 하위 호환성 유지 - 현재 미사용 */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function scoreTutorUsage(thisWeek: number, lastWeek: number): number {
-  if (thisWeek === 0 && lastWeek === 0) return 0;          // 미사용 신규 수강생
-  if (thisWeek === 0 && lastWeek > 0)   return WEIGHT_TUTOR_USAGE; // 완전 중단
-  if (lastWeek === 0)                   return 0;          // 이번 주 첫 사용 → 정상
+  if (thisWeek === 0 && lastWeek === 0) return 0;
+  if (thisWeek === 0 && lastWeek > 0)   return 10;
+  if (lastWeek === 0)                   return 0;
   const ratio = thisWeek / lastWeek;
-  if (ratio >= 0.5) return 0;                                           // 50% 이상 유지 → 정상
-  if (ratio > 0)    return Math.round(WEIGHT_TUTOR_USAGE * 0.5);        // 50% 미만 → 5점
-  return WEIGHT_TUTOR_USAGE;                                            // 완전 중단
+  if (ratio >= 0.5) return 0;
+  if (ratio > 0)    return 5;
+  return 10;
 }
 
 /**
@@ -172,6 +245,12 @@ interface BatchData {
   assignment:       Map<string, string[]>;            // key → recent 3개 status[]
   counseling:       Map<string, number>;              // key → negative 상담 수
   tutor:            Map<string, { thisWeek: number; lastWeek: number }>;
+  aiActivity:       Map<string, {                     // Q5: AI 상호작용 복합 지표
+    activeDays:    number;  // 14일 중 메시지 보낸 고유 날짜 수
+    thisWeekMsgs:  number;  // 이번 주(7일) 메시지 수
+    lastWeekMsgs:  number;  // 전주(8~14일) 메시지 수
+    total14dMsgs:  number;  // 14일 전체 메시지 수
+  }>;
 }
 
 /**
@@ -304,7 +383,48 @@ async function loadBatchData(studentRows: StudentRow[]): Promise<BatchData> {
     });
   }
 
-  return { attendance, attendanceHasData, assignment, counseling, tutor };
+  // ── Q5. AI 상호작용 복합 지표 (활동일 수 + 빈도 추세) ─────────────────────────
+  // 이번 주 / 전주 메시지 수 + 14일 중 활동한 고유 날짜 수를 단일 쿼리로 산출합니다.
+  // KST 기준 날짜 경계 처리를 위해 AT TIME ZONE 'Asia/Seoul' 적용.
+  const rawAiActivity = await db.execute<{
+    student_id:    string;
+    course_id:     string;
+    active_days:   number;
+    this_week_msgs: number;
+    last_week_msgs: number;
+    total_14d_msgs: number;
+  }>(sql`
+    SELECT
+      student_id,
+      course_id,
+      count(DISTINCT DATE(created_at AT TIME ZONE 'Asia/Seoul'))::int AS active_days,
+      count(*) FILTER (WHERE created_at >= ${oneWeekIso}::timestamptz)::int AS this_week_msgs,
+      count(*) FILTER (WHERE created_at >= ${twoWeekIso}::timestamptz
+                         AND created_at <  ${oneWeekIso}::timestamptz)::int AS last_week_msgs,
+      count(*)::int AS total_14d_msgs
+    FROM conversation_messages
+    WHERE student_id = ANY(${sql.raw(`ARRAY[${studentIds.map((id) => `'${id}'`).join(',')}]::uuid[]`)})
+      AND role = 'user'
+      AND created_at >= ${twoWeekIso}::timestamptz
+      AND student_id IS NOT NULL
+      AND course_id  IS NOT NULL
+    GROUP BY student_id, course_id
+  `);
+
+  const aiActivity = new Map<string, {
+    activeDays: number; thisWeekMsgs: number; lastWeekMsgs: number; total14dMsgs: number;
+  }>();
+  for (const row of rawAiActivity) {
+    if (!row.student_id || !row.course_id) continue;
+    aiActivity.set(`${row.student_id}:${row.course_id}`, {
+      activeDays:   Number(row.active_days),
+      thisWeekMsgs: Number(row.this_week_msgs),
+      lastWeekMsgs: Number(row.last_week_msgs),
+      total14dMsgs: Number(row.total_14d_msgs),
+    });
+  }
+
+  return { attendance, attendanceHasData, assignment, counseling, tutor, aiActivity };
 }
 
 // ── 단일 수강생 점수 산출 + 저장 (소량 호출 전용 공개 API) ────────────────────
@@ -326,16 +446,22 @@ export async function computeAndSaveEwsScore(
   const recentStatuses = batchData.assignment.get(key) ?? [];
   const missingCount   = recentStatuses.filter((s) => s === 'missing' || s === 'late').length;
   const negativeCount  = batchData.counseling.get(key) ?? 0;
-  const tutorEntry     = batchData.tutor.get(key) ?? { thisWeek: 0, lastWeek: 0 };
+  const aiEntry        = batchData.aiActivity.get(key) ?? { activeDays: 0, thisWeekMsgs: 0, lastWeekMsgs: 0, total14dMsgs: 0 };
 
   const components: EwsComponentScores = {
-    attendance: scoreAttendance(absentDays, hasAttData),
-    assignment: scoreAssignment(missingCount),
-    counseling: scoreCounseling(negativeCount),
-    tutorUsage: scoreTutorUsage(tutorEntry.thisWeek, tutorEntry.lastWeek),
+    attendance:    scoreAttendance(absentDays, hasAttData),
+    assignment:    scoreAssignment(missingCount),
+    counseling:    scoreCounseling(negativeCount),
+    aiInteraction: scoreAiInteraction(
+      aiEntry.activeDays,
+      aiEntry.thisWeekMsgs,
+      aiEntry.lastWeekMsgs,
+      aiEntry.total14dMsgs,
+      hasAttData,   // LMS 연동 여부 = 출결 데이터 존재 여부
+    ),
   };
   const totalScore = components.attendance + components.assignment +
-                     components.counseling + components.tutorUsage;
+                     components.counseling + components.aiInteraction;
   const riskLevel  = classifyRiskLevel(totalScore);
 
   await db.insert(ewsRiskScores).values({
@@ -450,16 +576,22 @@ export async function runEwsMonitor(
       const recentStatuses = batchData.assignment.get(key) ?? [];
       const missingCount   = recentStatuses.filter((s) => s === 'missing' || s === 'late').length;
       const negativeCount  = batchData.counseling.get(key) ?? 0;
-      const tutorEntry     = batchData.tutor.get(key) ?? { thisWeek: 0, lastWeek: 0 };
+      const aiEntry        = batchData.aiActivity.get(key) ?? { activeDays: 0, thisWeekMsgs: 0, lastWeekMsgs: 0, total14dMsgs: 0 };
 
       const components: EwsComponentScores = {
-        attendance: scoreAttendance(absentDays, hasAttData),
-        assignment: scoreAssignment(missingCount),
-        counseling: scoreCounseling(negativeCount),
-        tutorUsage: scoreTutorUsage(tutorEntry.thisWeek, tutorEntry.lastWeek),
+        attendance:    scoreAttendance(absentDays, hasAttData),
+        assignment:    scoreAssignment(missingCount),
+        counseling:    scoreCounseling(negativeCount),
+        aiInteraction: scoreAiInteraction(
+          aiEntry.activeDays,
+          aiEntry.thisWeekMsgs,
+          aiEntry.lastWeekMsgs,
+          aiEntry.total14dMsgs,
+          hasAttData,   // LMS 연동 여부 = 출결 데이터 존재 여부
+        ),
       };
       const totalScore = components.attendance + components.assignment +
-                         components.counseling + components.tutorUsage;
+                         components.counseling + components.aiInteraction;
       const riskLevel  = classifyRiskLevel(totalScore, agent.institutionId);
 
       scoresToInsert.push({

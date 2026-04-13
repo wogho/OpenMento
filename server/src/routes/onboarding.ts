@@ -24,7 +24,7 @@ const router: ReturnType<typeof Router> = Router();
 
 // 모든 온보딩 라우트는 인증 필수 + 최소 역할 검사 (RBAC — Phase 5-5)
 router.use(authenticate);
-router.use(requireRole('student', 'instructor', 'admin', 'super_admin'));
+router.use(requireRole('student', 'teacher', 'admin'));
 
 // 허용된 투어 ID 목록 (화이트리스트) — Gemini 제언 ③ 도메인별 투어 포함
 const VALID_TOUR_IDS = [
@@ -37,10 +37,10 @@ type TourId = (typeof VALID_TOUR_IDS)[number];
 
 // 투어별 최소 허용 역할 (역할 기반 투어 분리 — Phase 5-5)
 const TOUR_ALLOWED_ROLES: Record<TourId, string[]> = {
-  'admin-tour':     ['admin', 'super_admin'],
-  'ews-tour':       ['instructor', 'admin', 'super_admin'],
-  'portfolio-tour': ['student', 'instructor', 'admin', 'super_admin'],
-  'student-tour':   ['student', 'instructor', 'admin', 'super_admin'],
+  'admin-tour':     ['admin'],
+  'ews-tour':       ['teacher', 'admin'],
+  'portfolio-tour': ['student', 'teacher', 'admin'],
+  'student-tour':   ['student', 'teacher', 'admin'],
 };
 
 const tourIdSchema = z.object({
