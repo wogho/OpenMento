@@ -83,15 +83,15 @@ export default function SetupPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-[100dvh] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
       <div className="w-full max-w-lg">
         {/* 헤더 */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-600 shadow mb-4">
             <img src="/icons/icon-192.png" alt="OpenMento" className="w-10 h-10 rounded-lg" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">OpenMento 초기 설정</h1>
-          <p className="text-sm text-gray-500 mt-1">플랫폼을 처음 사용하려면 아래 설정을 완료해 주세요.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">OpenMento 초기 설정</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">플랫폼을 처음 사용하려면 아래 설정을 완료해 주세요.</p>
         </div>
 
         {/* 진행 상태 바 */}
@@ -100,23 +100,23 @@ export default function SetupPage() {
             <div key={label} className="flex-1 flex flex-col items-center gap-1">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
-                  i < step ? 'bg-blue-600 text-white' : i === step ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-gray-200 text-gray-500'
+                  i < step ? 'bg-blue-600 text-white' : i === step ? 'bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
                 }`}
               >
                 {i < step ? '✓' : i + 1}
               </div>
-              <span className={`text-[11px] font-medium ${i === step ? 'text-blue-700' : 'text-gray-400'}`}>{label}</span>
+              <span className={`text-[11px] font-medium ${i === step ? 'text-blue-700 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'}`}>{label}</span>
             </div>
           ))}
         </div>
 
         {/* 카드 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 px-7 py-8">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 px-7 py-8">
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             {/* Step 0: 교육기관 정보 */}
             {step === 0 && (
               <div className="space-y-5">
-                <h2 className="text-base font-semibold text-gray-800">교육기관 정보를 입력해 주세요.</h2>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100">교육기관 정보를 입력해 주세요.</h2>
                 <Field label="기관명" error={errors.institutionName?.message}>
                   <input
                     type="text"
@@ -131,7 +131,7 @@ export default function SetupPage() {
             {/* Step 1: AI 에이전트 설정 */}
             {step === 1 && (
               <div className="space-y-5">
-                <h2 className="text-base font-semibold text-gray-800">AI 에이전트에 사용할 LLM을 선택하세요.</h2>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100">AI 에이전트에 사용할 LLM을 선택하세요.</h2>
                 <Field label="LLM 제공사" error={errors.llmProvider?.message}>
                   <select className={inputClass(false)} {...register('llmProvider')}>
                     <option value="openai">OpenAI (GPT-4o)</option>
@@ -146,7 +146,7 @@ export default function SetupPage() {
                     className={inputClass(!!errors.llmApiKey)}
                     {...register('llmApiKey')}
                   />
-                  <p className="text-xs text-gray-400 mt-1">지금 입력하지 않아도 관리자 페이지에서 나중에 설정할 수 있습니다.</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">지금 입력하지 않아도 관리자 페이지에서 나중에 설정할 수 있습니다.</p>
                 </Field>
               </div>
             )}
@@ -154,7 +154,7 @@ export default function SetupPage() {
             {/* Step 2: 관리자 계정 */}
             {step === 2 && (
               <div className="space-y-5">
-                <h2 className="text-base font-semibold text-gray-800">관리자 계정을 만들어 주세요.</h2>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100">관리자 계정을 만들어 주세요.</h2>
                 <Field label="이름" error={errors.adminName?.message}>
                   <input
                     type="text"
@@ -207,7 +207,7 @@ export default function SetupPage() {
               {step > 0 ? (
                 <button
                   type="button"
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition"
                   onClick={() => setStep((s) => s - 1)}
                 >
                   이전
@@ -250,7 +250,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 function inputClass(hasError: boolean) {
-  return `w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
-    hasError ? 'border-red-400' : 'border-gray-300'
+  return `w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-700 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition ${
+    hasError ? 'border-red-400' : 'border-gray-300 dark:border-slate-600'
   }`;
 }
