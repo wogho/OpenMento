@@ -1,0 +1,174 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1775417513017,
+      "tag": "0000_huge_tarot",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775418546687,
+      "tag": "0001_careless_invisible_woman",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775466339881,
+      "tag": "0002_wandering_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775501656977,
+      "tag": "0003_counseling_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775505000000,
+      "tag": "0004_consultation_bookings",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775505710511,
+      "tag": "0004_real_skreet",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775508692858,
+      "tag": "0005_github_repo_students",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775572512205,
+      "tag": "0006_oval_chronomancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775678748368,
+      "tag": "0007_deep_thunderbolts",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775715245330,
+      "tag": "0008_persona_templates_and_portfolio_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775767183205,
+      "tag": "0009_rls_tenant_isolation",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775800000000,
+      "tag": "0010_rls_composite_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775810000000,
+      "tag": "0011_onboarding_completions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775820000000,
+      "tag": "0012_onboarding_progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775900000000,
+      "tag": "0013_agent_role_data_retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1775835362327,
+      "tag": "0015_unknown_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1775854429409,
+      "tag": "0016_careful_hulk",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1775899611524,
+      "tag": "0017_dear_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1775912856366,
+      "tag": "0018_white_paladin",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1775927586056,
+      "tag": "0019_curly_raider",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1775947387769,
+      "tag": "0020_daily_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1775976209341,
+      "tag": "0021_outgoing_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1776013931881,
+      "tag": "0022_curvy_greymalkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776023792030,
+      "tag": "0023_romantic_mad_thinker",
+      "breakpoints": true
+    }
+  ]
+}

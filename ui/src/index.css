@@ -1,0 +1,249 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Apple System Colors — Light Mode ── */
+    --apple-blue:    #007AFF;
+    --apple-green:   #34C759;
+    --apple-red:     #FF3B30;
+    --apple-orange:  #FF9500;
+    --apple-yellow:  #FFCC00;
+    --apple-purple:  #AF52DE;
+    --apple-indigo:  #5856D6;
+    --apple-pink:    #FF2D55;
+    --apple-teal:    #5AC8FA;
+
+    /* ── Apple System Backgrounds — Light Mode ── */
+    --apple-bg:           #F2F2F7;
+    --apple-bg-secondary: #FFFFFF;
+    --apple-bg-tertiary:  #F2F2F7;
+    --apple-bg-card:      #FFFFFF;
+
+    /* ── Apple Labels — Light Mode ── */
+    --apple-label:           rgba(0, 0, 0, 1);
+    --apple-label-secondary: rgba(60, 60, 67, 0.6);
+    --apple-label-tertiary:  rgba(60, 60, 67, 0.3);
+
+    /* ── Apple Fills ── */
+    --apple-fill:           rgba(120, 120, 128, 0.20);
+    --apple-fill-secondary: rgba(120, 120, 128, 0.16);
+    --apple-fill-tertiary:  rgba(118, 118, 128, 0.12);
+
+    /* ── Apple Separators ── */
+    --apple-separator:        rgba(60, 60, 67, 0.29);
+    --apple-separator-opaque: #C6C6C8;
+
+    /* ── shadcn/ui CSS Variables (mapped to Apple HIG) ── */
+    --background:             0 0% 100%;
+    --foreground:             0 0% 4%;
+    --muted:                  240 5% 96%;
+    --muted-foreground:       240 4% 46%;
+    --popover:                0 0% 100%;
+    --popover-foreground:     240 10% 4%;
+    --card:                   0 0% 100%;
+    --card-foreground:        240 10% 4%;
+    --border:                 240 6% 90%;
+    --input:                  240 6% 90%;
+    --primary:                211 100% 50%;
+    --primary-foreground:     0 0% 100%;
+    --secondary:              240 5% 96%;
+    --secondary-foreground:   240 6% 10%;
+    --accent:                 240 5% 96%;
+    --accent-foreground:      240 6% 10%;
+    --destructive:            4 86% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --ring:                   211 100% 50%;
+    --radius:                 0.625rem;
+    --brand:                  211 100% 50%;
+    --brand-foreground:       211 100% 60%;
+
+    --chat-bg:          #F2F2F7;
+    --header-bg:        rgba(255, 255, 255, 0.85);
+    --bubble-user:      #007AFF;
+    --bubble-user-text: #ffffff;
+    --bubble-ai:        #ffffff;
+  }
+
+  .dark {
+    /* ── Apple System Colors — Dark Mode ── */
+    --apple-blue:    #0A84FF;
+    --apple-green:   #30D158;
+    --apple-red:     #FF453A;
+    --apple-orange:  #FF9F0A;
+    --apple-yellow:  #FFD60A;
+    --apple-purple:  #BF5AF2;
+    --apple-indigo:  #5E5CE6;
+    --apple-pink:    #FF375F;
+    --apple-teal:    #64D2FF;
+
+    /* ── Apple System Backgrounds — Dark Mode ── */
+    --apple-bg:           #1C1C1E;
+    --apple-bg-secondary: #2C2C2E;
+    --apple-bg-tertiary:  #3A3A3C;
+    --apple-bg-card:      #2C2C2E;
+
+    /* ── Apple Labels — Dark Mode ── */
+    --apple-label:           rgba(255, 255, 255, 1);
+    --apple-label-secondary: rgba(235, 235, 245, 0.6);
+    --apple-label-tertiary:  rgba(235, 235, 245, 0.3);
+
+    /* ── Apple Fills — Dark Mode ── */
+    --apple-fill:           rgba(120, 120, 128, 0.36);
+    --apple-fill-secondary: rgba(120, 120, 128, 0.28);
+    --apple-fill-tertiary:  rgba(118, 118, 128, 0.24);
+
+    /* ── Apple Separators — Dark Mode ── */
+    --apple-separator:        rgba(84, 84, 88, 0.65);
+    --apple-separator-opaque: #38383A;
+
+    /* ── shadcn/ui CSS Variables — Dark Mode ── */
+    --brand:                  213 100% 63%;
+    --background:             0 0% 11%;
+    --foreground:             0 0% 98%;
+    --brand-foreground:       211 100% 50%;
+    --muted:                  240 4% 16%;
+    --muted-foreground:       240 5% 65%;
+    --popover:                0 0% 11%;
+    --popover-foreground:     0 0% 98%;
+    --card:                   0 0% 11%;
+    --card-foreground:        0 0% 95%;
+    --border:                 240 4% 16%;
+    --input:                  240 4% 16%;
+    --primary:                211 100% 53%;
+    --primary-foreground:     0 0% 100%;
+    --secondary:              240 4% 16%;
+    --secondary-foreground:   0 0% 98%;
+    --accent:                 240 4% 16%;
+    --accent-foreground:      0 0% 98%;
+    --destructive:            4 90% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --ring:                   211 100% 53%;
+
+    --chat-bg:     #1C1C1E;
+    --header-bg:   rgba(28, 28, 30, 0.85);
+    --bubble-user: #0A84FF;
+    --bubble-ai:   #2C2C2E;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+  }
+  .dark *:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+
+  html {
+    @apply text-[14px] sm:text-[15px] md:text-base;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+      "Helvetica Neue", "Pretendard", "Apple SD Gothic Neo", ui-sans-serif, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+      "Helvetica Neue", "Pretendard", ui-sans-serif, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* ── macOS Sonoma Scrollbar (WebKit) ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.18);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.35) !important;
+  }
+  .dark *:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.18);
+  }
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.35) !important;
+  }
+}
+
+@layer components {
+  .chat-layout {
+    @apply flex flex-col h-[100dvh] max-w-[1280px] w-full mx-auto relative overflow-hidden;
+    background: var(--chat-bg);
+  }
+
+  .bubble-base {
+    @apply max-w-[75%] rounded-[1.25rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm break-words;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  .chat-input-bar {
+    @apply flex items-end gap-2 px-4 py-3;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid var(--apple-separator);
+  }
+  .dark .chat-input-bar {
+    background: rgba(28, 28, 30, 0.82);
+  }
+
+  .dm-card {
+    @apply bg-white dark:bg-[#2C2C2E] rounded-2xl;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+  .dark .dm-card {
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .vibrancy {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+  }
+  .dark .vibrancy {
+    background: rgba(30, 30, 32, 0.72);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+@theme inline {
+  @keyframes appear-zoom {
+    0%   { opacity: 0; transform: scale(0.96); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes appear {
+    0%   { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spring-in {
+    0%   { opacity: 0; transform: scale(0.94) translateY(4px); }
+    60%  { transform: scale(1.02) translateY(-1px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}

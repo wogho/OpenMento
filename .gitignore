@@ -1,0 +1,49 @@
+# 환경변수 (절대 커밋 금지)
+.env
+.env.local
+.env.*.local
+
+# 빌드 결과물
+dist/
+build/
+.next/
+
+# 의존성
+node_modules/
+
+# 로그
+*.log
+logs/
+
+# 에디터
+.vscode/settings.json
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pnpm
+.pnpm-store/
+
+# playwright
+
+# 내부 기획 문서 (퍼블릭 레포 비공개)
+../project.md
+../plan.md
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# 업로드된 교재 파일 (로컬 개발용)
+uploads/
+
+*storybook.log
+storybook-static
+QA.md
+plan.md
+all.md
+temp.txt
+test_output.txt

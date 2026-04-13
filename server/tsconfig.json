@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true,
+    "types": ["node"]
+  },
+  "references": [
+    { "path": "../packages/shared" },
+    { "path": "../packages/db" },
+    { "path": "../packages/rag" }
+  ],
+  "include": ["src/**/*"]
+}
