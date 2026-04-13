@@ -17,7 +17,7 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/rag/package.json ./packages/rag/
 COPY packages/rag-worker/package.json ./packages/rag-worker/
-RUN pnpm install
+RUN pnpm install --ignore-scripts
 
 # ── 빌드 ────────────────────────────────────────────────────
 FROM deps AS builder

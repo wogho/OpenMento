@@ -12,7 +12,7 @@ FROM base AS deps
 COPY pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY ui/package.json ./ui/
-RUN pnpm install
+RUN pnpm install --ignore-scripts
 
 # ── 개발 (Vite dev server) ───────────────────────────────────
 FROM deps AS dev

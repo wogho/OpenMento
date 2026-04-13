@@ -14,7 +14,7 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/rag/package.json ./packages/rag/
 COPY server/package.json ./server/
-RUN pnpm install
+RUN pnpm install --ignore-scripts
 
 # ── 개발 (nodemon hot-reload) ────────────────────────────────
 FROM deps AS dev
