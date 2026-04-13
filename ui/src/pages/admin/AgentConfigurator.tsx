@@ -290,7 +290,7 @@ export default function AgentConfigurator() {
       fallbackModel: agent.fallbackAdapterConfig?.model ?? '',
       budgetMonthlyCents: agent.budgetMonthlyCents ?? 1000,
       skillId: agent.skillId ?? '',
-      ragEnabled: agent.ragEnabled ?? true,
+      ragEnabled: agent.ragEnabled ?? false,
       heartbeatEnabled: agent.runtimeConfig?.heartbeat?.enabled ?? false,
       heartbeatIntervalSec: agent.runtimeConfig?.heartbeat?.intervalSec ?? 300,
       heartbeatMaxConcurrentRuns: agent.runtimeConfig?.heartbeat?.maxConcurrentRuns ?? 1,
