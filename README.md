@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <img src="ui/public/icons/icon-512.png" alt="OpenMento" width="80" />
+</p>
+
+<p align="center">
   <a href="#quickstart"><strong>빠른 시작</strong></a> &middot;
   <a href="doc/DEVELOPING.md"><strong>개발 문서</strong></a> &middot;
   <a href="https://github.com/wogho/OpenMento"><strong>GitHub</strong></a>
@@ -16,9 +20,21 @@
 
 <br/>
 
+## 데모
+
+| 구분 | 링크 |
+|------|------|
+| 전체 데모 | [openmento.cloud](https://openmento.cloud/) |
+| 수강생 데모 | [openmento.cloud/auth/student](https://openmento.cloud/auth/student) |
+| 관리자 데모 | [openmento.cloud/login/admin](https://openmento.cloud/login/admin) |
+
+> 데모는 로그인 계정 정보가 자동으로 기입됩니다.
+
+<br/>
+
 ## OpenMento이란?
 
-# AI 에이전트 기반의 교육 자율 운영 플랫폼
+## AI 에이전트 기반의 교육 자율 운영 플랫폼
 
 OpenMento는 AI 에이전트 팀을 조직하여 교육 기관의 운영 전반을 자동화하는 Node.js 서버와 React 대시보드입니다. 다양한 에이전트를 배치하고, 교육 목표를 할당하며, 단일 대시보드에서 에이전트의 작업과 비용을 추적할 수 있습니다.
 
@@ -43,11 +59,10 @@ OpenMento는 AI 에이전트 팀을 조직하여 교육 기관의 운영 전반�
   <tr>
     <td align="center"><strong>연동<br/>가능</strong></td>
     <td align="center"><img src="https://cdn.simpleicons.org/anthropic/000000" width="32" alt="Claude" /><br/><sub>Claude</sub></td>
-    <td align="center"><img src="https://cdn.simpleicons.org/openai/000000" width="32" alt="GPT" /><br/><sub>GPT-4o</sub></td>
-    <td align="center"><img src="https://cdn.simpleicons.org/google/4285F4" width="32" alt="Gemini" /><br/><sub>Gemini</sub></td>
-    <td align="center"><img src="https://cdn.simpleicons.org/ollama/000000" width="32" alt="Ollama" /><br/><sub>Ollama</sub></td>
-    <td align="center"><img src="https://cdn.simpleicons.org/curl/073551" width="32" alt="HTTP" /><br/><sub>HTTP API</sub></td>
-    <td align="center"><img src="https://cdn.simpleicons.org/jsonwebtokens/000000" width="32" alt="MCP" /><br/><sub>MCP</sub></td>
+    <td align="center"><img src="https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white&style=flat-square" height="32" alt="GPT-4o" /><br/><sub>GPT-4o</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/googlegemini/4285F4" width="32" alt="Gemini" /><br/><sub>Gemini</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/googlegemini/8AB4F8" width="32" alt="Gemini CLI" /><br/><sub>Gemini CLI</sub></td>
+    <td align="center"><img src="https://cdn.simpleicons.org/curl/073551" width="32" alt="HTTP Webhook" /><br/><sub>HTTP API</sub></td>
   </tr>
 </table>
 
@@ -66,6 +81,8 @@ OpenMento는 AI 에이전트 팀을 조직하여 교육 기관의 운영 전반�
 - 스마트폰에서도 교육 운영 현황을 **원격으로 확인**하려는 경우
 
 <br/>
+
+
 
 ## 우리가 해결하는 진짜 문제
 
