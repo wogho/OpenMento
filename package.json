@@ -8,7 +8,7 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "predev": "pnpm --filter @openmento/db build",
+    "postinstall": "pnpm --filter @openmento/db build",
     "dev": "pnpm --filter server dev & pnpm --filter ui dev",
     "build": "pnpm --filter '!ui' build && pnpm --filter ui build",
     "lint": "pnpm -r lint",
